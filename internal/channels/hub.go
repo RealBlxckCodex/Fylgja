@@ -135,6 +135,20 @@ func (h *Hub) channelFor(platform, botID string, dot uuid.UUID) Channel {
 	return h.shared[platform]
 }
 
+// SetDefaultDot setzt die Fylgja für Shared-Bots.
+func (h *Hub) SetDefaultDot(d uuid.UUID) {
+	h.mu.Lock()
+	h.DefaultDot = d
+	h.mu.Unlock()
+}
+
+// DefaultDotID liefert die Fylgja für Shared-Bots.
+func (h *Hub) DefaultDotID() uuid.UUID {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.DefaultDot
+}
+
 func (h *Hub) dotFor(ev InboundEvent) uuid.UUID {
 	h.mu.RLock()
 	defer h.mu.RUnlock()

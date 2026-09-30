@@ -62,6 +62,7 @@ type Server struct {
 	Secure    bool   // Secure-Cookies (https)
 	RouterToken string // /router/v1 (leer = deaktiviert)
 	HookKey   []byte // HMAC-Basis für Webhooks
+	SkillKey  []byte // Basis für Skill-Signaturen
 	Version   string
 
 	idem    sync.Map
@@ -339,4 +340,11 @@ func (s *Server) dotInWorkspace(r *http.Request, dot uuid.UUID) error {
 		return errForbidden
 	}
 	return nil
+}
+
+func firstNonEmpty(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
 }

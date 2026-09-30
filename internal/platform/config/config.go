@@ -76,6 +76,7 @@ type ModelSeed struct {
 	QualityRank  int      `yaml:"quality_rank"`
 	Capabilities []string `yaml:"capabilities"`
 	MaxContext   int      `yaml:"max_context"`
+	Fallbacks    []string `yaml:"fallbacks"`
 }
 
 type DeploymentSeed struct {

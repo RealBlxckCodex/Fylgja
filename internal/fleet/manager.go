@@ -2,6 +2,8 @@ package fleet
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -60,7 +62,20 @@ type Node struct {
 	Metrics       Metrics   `json:"metrics"`
 	Deployments   []NodeDeployment `json:"deployments"`
 	// token authentifiziert den Node beim Tunnel-Aufbau (einmalig ausgegeben).
-	token string
+	token     string
+	tokenHash []byte
+}
+
+// Token liefert das Einmal-Token (nur direkt nach dem Anlegen gesetzt).
+func (n *Node) Token() string { return n.token }
+
+// TokenHash liefert den Hash des Tokens (Persistenz).
+func (n *Node) TokenHash() []byte {
+	if n.token != "" {
+		h := sha256.Sum256([]byte(n.token))
+		return h[:]
+	}
+	return n.tokenHash
 }
 
 // Alert ist ein Alarm an den Owner (16.11).
@@ -93,6 +108,8 @@ type Manager struct {
 	Log       *slog.Logger
 	OnAlert   func(Alert)
 	OnEvent   func(kind string, detail map[string]any) // Audit/Scale-Event-Historie
+	// Persist speichert einen Node nach jeder Zustandsänderung (DB).
+	Persist func(n Node, tokenHash []byte)
 	RouterURL string                                   // für die Node-Env (Tunnel-Ziel)
 
 	HeartbeatTimeout time.Duration // Default 20 s
@@ -136,6 +153,28 @@ func (m *Manager) alert(a Alert) {
 	}
 }
 
+func (m *Manager) persist(n *Node) {
+	if m.Persist != nil && n != nil {
+		m.mu.Lock()
+		cp, h := *n, n.TokenHash()
+		m.mu.Unlock()
+		m.Persist(cp, h)
+	}
+}
+
+// Restore lädt persistierte Nodes nach einem Neustart (Tunnel muss neu aufgebaut werden).
+func (m *Manager) Restore(n Node, tokenHash []byte) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := n
+	cp.tokenHash = tokenHash
+	cp.TunnelState = "down"
+	if cp.State == Ready {
+		cp.State = Provisioning // erst nach neuem Tunnel + Health-Probe wieder ready
+	}
+	m.nodes[cp.ID] = &cp
+}
+
 func (m *Manager) event(kind string, detail map[string]any) {
 	if m.OnEvent != nil {
 		m.OnEvent(kind, detail)
@@ -173,6 +212,9 @@ func (m *Manager) AddStatic(n Node, token string) *Node {
 	n.StartedAt = m.Clock.Now()
 	n.token = token
 	m.nodes[n.ID] = &n
+	m.mu.Unlock()
+	m.persist(&n)
+	m.mu.Lock()
 	return &n
 }
 
@@ -205,6 +247,7 @@ func (m *Manager) Provision(ctx context.Context, pool string) (*Node, error) {
 	m.nodes[id] = n
 	m.lastScale[pool] = m.Clock.Now()
 	m.mu.Unlock()
+	m.persist(n)
 	m.event("fleet.provision", map[string]any{"node": id, "pool": pool, "pod": pod.ID})
 	return n, nil
 }
@@ -214,7 +257,11 @@ func (m *Manager) Authenticate(nodeID, token string) (*Node, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	n, ok := m.nodes[nodeID]
-	if !ok || n.token == "" || n.token != token || n.State == Gone || n.State == Terminating {
+	if !ok || n.State == Gone || n.State == Terminating || token == "" {
+		return nil, false
+	}
+	h := sha256.Sum256([]byte(token))
+	if subtle.ConstantTimeCompare(h[:], n.TokenHash()) != 1 {
 		return nil, false
 	}
 	return n, true
@@ -260,6 +307,9 @@ func (m *Manager) Register(nodeID string, reg Registration) error {
 		n.Region = reg.Region
 	}
 	n.Deployments = reg.Deployments
+	m.mu.Unlock()
+	m.persist(n)
+	m.mu.Lock()
 	return nil
 }
 
@@ -272,6 +322,9 @@ func (m *Manager) MarkReady(nodeID string) {
 		n.ReadyAt = m.Clock.Now()
 	}
 	m.mu.Unlock()
+	if ok {
+		m.persist(n)
+	}
 	if ok && m.Hook != nil {
 		m.Hook.NodeReady(n)
 	}
@@ -317,6 +370,7 @@ func (m *Manager) Drain(nodeID string) error {
 	}
 	n.State = Draining
 	m.mu.Unlock()
+	m.persist(n)
 	if m.Hook != nil {
 		m.Hook.NodeDraining(n)
 	}
@@ -345,8 +399,9 @@ func (m *Manager) Terminate(ctx context.Context, nodeID string) error {
 		}
 	}
 	m.mu.Lock()
-	n.State, n.TerminatedAt, n.token = Gone, m.Clock.Now(), ""
+	n.State, n.TerminatedAt, n.token, n.tokenHash = Gone, m.Clock.Now(), "", nil
 	m.mu.Unlock()
+	m.persist(n)
 	if m.Hook != nil {
 		m.Hook.NodeGone(n)
 	}
@@ -458,6 +513,7 @@ func (m *Manager) Tick(ctx context.Context) {
 	m.mu.Unlock()
 
 	for _, n := range stale {
+		m.persist(n)
 		m.alert(Alert{Kind: "node_unhealthy", NodeID: n.ID, Message: fmt.Sprintf("kein heartbeat seit %s", m.HeartbeatTimeout)})
 		if m.Hook != nil {
 			m.Hook.NodeDraining(n)
