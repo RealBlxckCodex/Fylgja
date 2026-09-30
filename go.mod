@@ -4,7 +4,9 @@ go 1.25.0
 
 require (
 	cel.dev/cel-go v0.32.0
+	github.com/coder/websocket v1.8.15
 	github.com/google/uuid v1.6.0
+	github.com/hashicorp/yamux v0.1.2
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/pressly/goose/v3 v3.26.0
 	golang.org/x/crypto v0.44.0
