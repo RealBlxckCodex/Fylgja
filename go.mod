@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	cel.dev/cel-go v0.32.0
+	github.com/bwmarrin/discordgo v0.29.0
 	github.com/coder/websocket v1.8.15
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/yamux v0.1.2
@@ -16,6 +17,7 @@ require (
 require (
 	cel.dev/expr v0.25.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
+	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
