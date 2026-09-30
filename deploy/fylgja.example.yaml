@@ -1,0 +1,58 @@
+# Fylgja-Konfiguration (Spec 21.1). Secrets NICHT hier, sondern per Umgebungsvariablen.
+listen: ":8080"
+log_level: info
+role: all
+
+auth:
+  session_ttl: 336h
+  webauthn_rp_id: fylgja.example.org
+  webauthn_origins: ["https://fylgja.example.org"]
+
+channels:
+  telegram: { enabled: true, mode: polling }   # oder webhook (FYLGJA_TELEGRAM_WEBHOOK_SECRET)
+  discord: { enabled: true, message_content_intent: false }
+
+router:
+  # Logische Modelle – Agents sprechen nur diese Namen (Spec 16.2).
+  models:
+    - { name: planner-default, privacy_class: self_hosted, quality_rank: 3, capabilities: [tools, json_mode], max_context: 65536, fallbacks: [worker-default] }
+    - { name: worker-default,  privacy_class: self_hosted, quality_rank: 2, capabilities: [tools, json_mode], max_context: 65536, fallbacks: [triage-fast] }
+    - { name: triage-fast,     privacy_class: self_hosted, quality_rank: 1, capabilities: [json_mode], max_context: 32768 }
+    - { name: reviewer,        privacy_class: self_hosted, quality_rank: 2, capabilities: [json_mode] }
+    - { name: embedder,        privacy_class: self_hosted, quality_rank: 1 }
+    - { name: stt,             privacy_class: self_hosted, quality_rank: 1 }
+  # Statische Deployments (RunPod-Nodes melden sich zusätzlich selbst über den Tunnel an).
+  deployments:
+    - { name: local-triage,   model: triage-fast, provider: local, engine: ollama, endpoint: "http://ollama:11434/v1", served_model: "qwen3:8b", max_concurrency: 4 }
+    - { name: local-embedder, model: embedder,    provider: local, engine: ollama, endpoint: "http://ollama:11434/v1", served_model: "bge-m3", max_concurrency: 8 }
+    # Externer Fallback – nur für Fylgjur mit privacy_mode "any" bzw. "eu_only" (EU-Region).
+    - { name: anthropic-planner, model: planner-default, provider: external, engine: remote_api, kind: anthropic, endpoint: "https://api.anthropic.com",
+        served_model: "claude-sonnet-5-5", api_key_env: ANTHROPIC_API_KEY, max_concurrency: 8, price_in_micro_eur_per_mtok: 2800000, price_out_micro_eur_per_mtok: 14000000 }
+  tiers: { planner: planner-default, worker: worker-default, triage: triage-fast, reviewer: reviewer }
+
+fleet:
+  enabled: true
+  eval_interval: 15s
+  pod_template:
+    gpu_type: "NVIDIA L40S"      # ≥ 48 GB VRAM für das Hauptmodell
+    gpu_count: 1
+    image: "ghcr.io/realblxckcodex/fylgja-node:latest"
+    network_volume_id: ""        # Modellgewichte vorab im Volume
+    cloud_type: SECURE
+    region: "EU-RO-1"
+
+sandbox:
+  provider: docker-gvisor        # docker-gvisor | docker (nur Entwicklung) | static | none
+  image: ghcr.io/realblxckcodex/fylgja-computer:base
+  idle_sleep: 15m
+  hosts:
+    - { name: host-1, endpoint: "unix:///var/run/docker.sock" }
+
+runtime:
+  max_parallel_runs_per_dot: 4
+  max_steps: 40
+  model_timeout: 120s
+  tool_timeout: 120s
+
+features:
+  memory_extraction: true

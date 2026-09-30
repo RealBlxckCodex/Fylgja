@@ -51,3 +51,13 @@ func TestMissingMasterKey(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestExampleConfigIsValid(t *testing.T) {
+	t.Setenv("FYLGJA_MASTER_KEY", "k")
+	t.Setenv("FYLGJA_DATABASE_URL", "postgres://x")
+	t.Setenv("FYLGJA_TELEGRAM_TOKEN", "1:x")
+	t.Setenv("FYLGJA_DISCORD_TOKEN", "x")
+	if _, err := Load("../../../deploy/fylgja.example.yaml"); err != nil {
+		t.Fatalf("beispielkonfiguration ungültig: %v", err)
+	}
+}

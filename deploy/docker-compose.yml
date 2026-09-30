@@ -1,0 +1,97 @@
+# Referenz-Deployment (Spec 21.2): Traefik → fylgja → PostgreSQL 17 + pgvector, egressd für Sandboxen.
+# Start: cp deploy/.env.example deploy/.env && $EDITOR deploy/.env && docker compose -f deploy/docker-compose.yml up -d
+name: fylgja
+
+services:
+  traefik:
+    image: traefik:v3.5
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --certificatesresolvers.le.acme.tlschallenge=true
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+    ports: ["80:80", "443:443"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+    networks: [web]
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: fylgja
+      POSTGRES_USER: fylgja
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD setzen}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fylgja"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+
+  fylgja:
+    image: ghcr.io/realblxckcodex/fylgja:latest
+    build: { context: .., dockerfile: Dockerfile }
+    command: ["serve", "-config", "/etc/fylgja/fylgja.yaml"]
+    environment:
+      FYLGJA_DATABASE_URL: postgres://fylgja:${POSTGRES_PASSWORD}@postgres:5432/fylgja?sslmode=disable
+      FYLGJA_MASTER_KEY: ${FYLGJA_MASTER_KEY:?FYLGJA_MASTER_KEY setzen (fylgja keygen)}
+      FYLGJA_BASE_URL: https://${FYLGJA_DOMAIN}
+      FYLGJA_TELEGRAM_TOKEN: ${FYLGJA_TELEGRAM_TOKEN:-}
+      FYLGJA_DISCORD_TOKEN: ${FYLGJA_DISCORD_TOKEN:-}
+      FYLGJA_RUNPOD_API_KEY: ${FYLGJA_RUNPOD_API_KEY:-}
+      FYLGJA_SEARXNG_URL: http://searxng:8080
+      FYLGJA_SANDBOX_NETWORK: fylgja_sandbox
+      FYLGJA_EGRESS_PROXY: http://egressd:3128
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - ./fylgja.yaml:/etc/fylgja/fylgja.yaml:ro
+      # Nur nötig für den Sandbox-Provider docker-gvisor auf demselben Host.
+      # Sicherer: separater Sandbox-Host mit TLS-geschützter Docker-API (sandbox.hosts).
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [web, internal, sandbox]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.fylgja.rule=Host(`${FYLGJA_DOMAIN}`)
+      - traefik.http.routers.fylgja.entrypoints=websecure
+      - traefik.http.routers.fylgja.tls.certresolver=le
+      - traefik.http.services.fylgja.loadbalancer.server.port=8080
+      - traefik.http.middlewares.fylgja-hsts.headers.stsSeconds=31536000
+      - traefik.http.routers.fylgja.middlewares=fylgja-hsts
+    restart: unless-stopped
+
+  # Egress-Proxy: einziger Ausgang der Sandboxen (Spec 13.7).
+  egressd:
+    image: ghcr.io/realblxckcodex/fylgja:latest
+    entrypoint: ["/usr/local/bin/egressd", "-policy", "/etc/fylgja/egress.json"]
+    volumes: [./egress.json:/etc/fylgja/egress.json:ro]
+    networks: [sandbox, egress]
+    restart: unless-stopped
+
+  searxng:
+    image: searxng/searxng:latest
+    profiles: [search]
+    environment: { SEARXNG_BASE_URL: http://searxng:8080/ }
+    volumes: [./searxng:/etc/searxng]
+    networks: [internal, egress]
+    restart: unless-stopped
+
+networks:
+  web: {}
+  internal: { internal: true }
+  # Sandbox-Netz ohne Default-Route: Ausgang nur über egressd.
+  sandbox: { internal: true, name: fylgja_sandbox }
+  egress: {}
+
+volumes:
+  pgdata: {}
+  letsencrypt: {}

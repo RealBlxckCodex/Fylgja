@@ -1,0 +1,4 @@
+{
+  "default": { "mode": "open", "deny": ["pastebin.com", "transfer.sh", "webhook.site", "requestbin.net"], "per_min": 600 },
+  "sources": {}
+}
