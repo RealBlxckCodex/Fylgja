@@ -59,6 +59,9 @@ type Input struct {
 	Depth         int             `json:"depth,omitempty"`
 	Privacy       string          `json:"privacy,omitempty"`
 	NoTools       bool            `json:"no_tools,omitempty"`
+	// Koordination: Knoten eines Work-Graphs, den dieser Run bearbeitet.
+	Graph string `json:"graph,omitempty"`
+	Node  string `json:"node,omitempty"`
 }
 
 // Run ist eine einzelne Ausführung des Agent-Loops.

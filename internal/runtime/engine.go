@@ -67,6 +67,8 @@ type Engine struct {
 	ImageHosts   []string
 	// OnFinish wird nach erfolgreichem Run aufgerufen (Memory-Extraktion, Usage-Reports).
 	OnFinish func(ctx context.Context, run *Run, final string)
+	// OnFail wird nach endgültigem Fehlschlag/Abbruch aufgerufen (Koordination).
+	OnFail func(ctx context.Context, run *Run, reason string)
 
 	mu     sync.Mutex
 	active map[uuid.UUID]*activeRun
@@ -483,6 +485,9 @@ func (e *Engine) Execute(parent context.Context, id uuid.UUID) (err error) {
 	default:
 		_, _ = e.Store.Append(final, id, EvError, map[string]string{"error": e.redact(err.Error())})
 		_ = e.Store.SetStatus(final, id, Failed, e.redact(err.Error()))
+		if e.OnFail != nil {
+			e.OnFail(final, run, e.redact(err.Error()))
+		}
 		if run.Kind == KindChat || run.Kind == KindTaskStep {
 			if e.Out != nil {
 				_ = e.Out.Final(final, run, "⚠️ Das hat nicht geklappt: "+e.redact(err.Error()))
