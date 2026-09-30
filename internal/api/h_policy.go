@@ -68,7 +68,7 @@ func (s *Server) saveRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := principal(r)
-	if broadAllow(in) && !p.SteppedUp(timeNow()) {
+	if broadAllow(in) && !stepped(p) {
 		w.Header().Set("X-Fylgja-Step-Up", "required")
 		problem(w, 428, "breite allow-regel: step-up erforderlich")
 		return
@@ -241,7 +241,7 @@ func (s *Server) decideProposal(accept bool) http.HandlerFunc {
 			switch typ {
 			case "rule":
 				in := ruleIn{Name: str(pl["name"]), Expr: str(pl["expr"]), Effect: firstNonEmpty(str(pl["effect"]), "allow"), DotID: dot.String()}
-				if broadAllow(in) && !p.SteppedUp(timeNow()) {
+				if broadAllow(in) && !stepped(p) {
 					w.Header().Set("X-Fylgja-Step-Up", "required")
 					problem(w, 428, "step-up erforderlich")
 					return

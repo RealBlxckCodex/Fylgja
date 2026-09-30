@@ -179,7 +179,7 @@ func need(action string) func(http.Handler) http.Handler {
 func stepUp(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := principal(r)
-		if p == nil || p.ViaToken || !p.SteppedUp(time.Now()) {
+		if p == nil || !stepped(p) {
 			w.Header().Set("X-Fylgja-Step-Up", "required")
 			problem(w, http.StatusPreconditionRequired, "step-up erforderlich: bitte mit passkey oder passwort bestätigen")
 			return
@@ -352,4 +352,18 @@ func firstNonEmpty(a, b string) string {
 		return a
 	}
 	return b
+}
+
+// stepped: frische Step-up-Session oder API-Token mit ausdrücklichem Scope "stepup"
+// (nur mit Step-up erzeugbar, für Automatisierung/CLI).
+func stepped(p *auth.Principal) bool {
+	if p.ViaToken {
+		for _, s := range p.Scopes {
+			if s == "stepup" {
+				return true
+			}
+		}
+		return false
+	}
+	return p.SteppedUp(time.Now())
 }

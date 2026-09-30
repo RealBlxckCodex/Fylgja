@@ -86,6 +86,7 @@ func (s *Server) routes(r chi.Router) {
 	r.With(need("manage"), stepUp).Post("/fleet/nodes/{id}/drain", s.nodeAction("drain"))
 	r.With(need("own"), stepUp).Post("/fleet/nodes/{id}/terminate", s.nodeAction("terminate"))
 	r.With(need("own"), stepUp).Post("/fleet/pools/{pool}/provision", s.provision)
+	r.With(need("own"), stepUp).Post("/fleet/nodes", s.addStaticNode)
 	r.With(need("own"), stepUp).Put("/fleet/policies", s.setPolicy)
 	r.Get("/usage", s.costs)
 	r.With(need("own")).Put("/budgets", s.putBudget)

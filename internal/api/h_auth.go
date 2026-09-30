@@ -237,6 +237,13 @@ func (s *Server) createToken(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, err.Error())
 		return
 	}
+	for _, sc := range in.Scopes {
+		if (sc == "stepup" || sc == "*") && !stepped(principal(r)) {
+			w.Header().Set("X-Fylgja-Step-Up", "required")
+			problem(w, 428, "tokens mit scope 'stepup' erfordern step-up")
+			return
+		}
+	}
 	tok, err := s.Auth.CreateToken(r.Context(), principal(r).UserID, in.Name, in.Scopes, time.Duration(in.TTLDays)*24*time.Hour)
 	if err != nil {
 		problem(w, 500, err.Error())

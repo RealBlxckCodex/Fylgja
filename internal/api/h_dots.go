@@ -136,7 +136,7 @@ func (s *Server) patchDot(w http.ResponseWriter, r *http.Request) {
 	}
 	p := principal(r)
 	loosen := (in.Autonomy != nil && *in.Autonomy > cur.Autonomy) || (in.Privacy != nil && privRank(*in.Privacy) < privRank(cur.PrivacyMode))
-	if loosen && !p.SteppedUp(timeNow()) {
+	if loosen && !stepped(p) {
 		w.Header().Set("X-Fylgja-Step-Up", "required")
 		problem(w, 428, "step-up erforderlich (mehr autonomie / weniger privacy)")
 		return
@@ -548,7 +548,7 @@ func (s *Server) resolveApproval(w http.ResponseWriter, r *http.Request) {
 		problem(w, 403, "keine freigabeberechtigung")
 		return
 	}
-	res := policy.Resolution{UserID: p.UserID.String(), Via: "web", Approve: in.Approve, Reason: in.Reason, StepUpDone: p.SteppedUp(timeNow())}
+	res := policy.Resolution{UserID: p.UserID.String(), Via: "web", Approve: in.Approve, Reason: in.Reason, StepUpDone: stepped(p)}
 	got, err := s.Runtime.ResolveApproval(r.Context(), id, res)
 	switch err {
 	case nil:

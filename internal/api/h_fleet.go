@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -279,4 +280,28 @@ func (s *Server) putBudget(w http.ResponseWriter, r *http.Request) {
 	}
 	s.audit(r, "budget.set", in.ScopeID.String(), map[string]any{"scope": in.Scope, "period": in.Period, "limit": in.Limit, "hard": in.Hard})
 	writeJSON(w, 200, in)
+}
+
+// addStaticNode registriert einen lokalen Inference-Server (Ollama/llama.cpp/vLLM auf eigener Hardware).
+func (s *Server) addStaticNode(w http.ResponseWriter, r *http.Request) {
+	if s.Fleet == nil {
+		problem(w, 501, "flotte nicht aktiv")
+		return
+	}
+	var in struct {
+		Name   string `json:"name"`
+		Region string `json:"region"`
+	}
+	if err := decode(r, &in); err != nil || in.Name == "" {
+		problem(w, 400, "name fehlt")
+		return
+	}
+	tok := uuid.NewString() + uuid.NewString()
+	n := s.Fleet.AddStatic(fleet.Node{Name: in.Name, Region: in.Region, Pool: "static"}, tok)
+	s.audit(r, "fleet.add_node", n.ID, map[string]any{"name": in.Name})
+	url := strings.Replace(strings.Replace(s.BaseURL, "https://", "wss://", 1), "http://", "ws://", 1) + "/api/v1/node/tunnel"
+	writeJSON(w, 201, map[string]any{"id": n.ID, "token": tok, "router_url": url,
+		"env": map[string]string{"FYLGJA_ROUTER_URL": url, "FYLGJA_NODE_ID": n.ID, "FYLGJA_NODE_TOKEN": tok, "FYLGJA_UPSTREAM": "127.0.0.1:11434",
+			"FYLGJA_DEPLOYMENTS": `[{"model":"triage-fast","served_model":"qwen3:8b","engine":"ollama","max_concurrency":4}]`},
+		"hint": "Token wird nur einmal angezeigt."})
 }
