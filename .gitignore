@@ -1,0 +1,8 @@
+/bin/
+/dist/
+web/node_modules/
+*.test
+*.out
+.env
+fylgja.yaml
+master.key
