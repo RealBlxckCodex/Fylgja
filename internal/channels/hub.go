@@ -691,10 +691,10 @@ func (h *Hub) DeliverOnce(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	type item struct {
-		id                 int64
+		id                  int64
 		dot, platform, lane string
-		target, msg        []byte
-		attempts           int
+		target, msg         []byte
+		attempts            int
 	}
 	var items []item
 	for rows.Next() {

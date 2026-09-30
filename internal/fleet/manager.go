@@ -43,23 +43,23 @@ type Metrics struct {
 
 // Node ist ein GPU- oder lokaler Inference-Node.
 type Node struct {
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Pool          string    `json:"pool"`
-	Provider      string    `json:"provider"`
-	ProviderRef   string    `json:"provider_ref"`
-	GPUModel      string    `json:"gpu_model"`
-	GPUCount      int       `json:"gpu_count"`
-	VRAMGB        int       `json:"vram_gb"`
-	Region        string    `json:"region"`
-	State         NodeState `json:"state"`
-	TunnelState   string    `json:"tunnel_state"`
-	LastHeartbeat time.Time `json:"last_heartbeat"`
-	HourlyCost    int64     `json:"hourly_cost_micro_eur"`
-	StartedAt     time.Time `json:"started_at"`
-	ReadyAt       time.Time `json:"ready_at,omitzero"`
-	TerminatedAt  time.Time `json:"terminated_at,omitzero"`
-	Metrics       Metrics   `json:"metrics"`
+	ID            string           `json:"id"`
+	Name          string           `json:"name"`
+	Pool          string           `json:"pool"`
+	Provider      string           `json:"provider"`
+	ProviderRef   string           `json:"provider_ref"`
+	GPUModel      string           `json:"gpu_model"`
+	GPUCount      int              `json:"gpu_count"`
+	VRAMGB        int              `json:"vram_gb"`
+	Region        string           `json:"region"`
+	State         NodeState        `json:"state"`
+	TunnelState   string           `json:"tunnel_state"`
+	LastHeartbeat time.Time        `json:"last_heartbeat"`
+	HourlyCost    int64            `json:"hourly_cost_micro_eur"`
+	StartedAt     time.Time        `json:"started_at"`
+	ReadyAt       time.Time        `json:"ready_at,omitzero"`
+	TerminatedAt  time.Time        `json:"terminated_at,omitzero"`
+	Metrics       Metrics          `json:"metrics"`
 	Deployments   []NodeDeployment `json:"deployments"`
 	// token authentifiziert den Node beim Tunnel-Aufbau (einmalig ausgegeben).
 	token     string
@@ -101,16 +101,16 @@ type Pressure interface {
 
 // Manager verwaltet die Flotte.
 type Manager struct {
-	Provider  Provider
-	Hook      RouterHook
-	Pressure  Pressure
-	Clock     clock.Clock
-	Log       *slog.Logger
-	OnAlert   func(Alert)
-	OnEvent   func(kind string, detail map[string]any) // Audit/Scale-Event-Historie
+	Provider Provider
+	Hook     RouterHook
+	Pressure Pressure
+	Clock    clock.Clock
+	Log      *slog.Logger
+	OnAlert  func(Alert)
+	OnEvent  func(kind string, detail map[string]any) // Audit/Scale-Event-Historie
 	// Persist speichert einen Node nach jeder Zustandsänderung (DB).
-	Persist func(n Node, tokenHash []byte)
-	RouterURL string                                   // für die Node-Env (Tunnel-Ziel)
+	Persist   func(n Node, tokenHash []byte)
+	RouterURL string // für die Node-Env (Tunnel-Ziel)
 
 	HeartbeatTimeout time.Duration // Default 20 s
 
@@ -269,9 +269,9 @@ func (m *Manager) Authenticate(nodeID, token string) (*Node, bool) {
 
 // Registration meldet der Node-Agent nach Tunnel-Aufbau.
 type Registration struct {
-	GPUModel    string   `json:"gpu_model"`
-	GPUCount    int      `json:"gpu_count"`
-	VRAMGB      int      `json:"vram_gb"`
+	GPUModel    string           `json:"gpu_model"`
+	GPUCount    int              `json:"gpu_count"`
+	VRAMGB      int              `json:"vram_gb"`
 	Deployments []NodeDeployment `json:"deployments"` // geladene Modelle
 	Region      string           `json:"region"`
 }

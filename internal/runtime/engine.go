@@ -46,25 +46,25 @@ type Publisher interface {
 
 // Engine führt Runs aus.
 type Engine struct {
-	Store     *Store
-	LLM       llm.Client
-	Tools     *tools.Registry
-	Reviewer  policy.Reviewer
-	Memory    MemoryAPI
-	Redactor  *vault.Redactor
-	Audit     audit.Logger
-	Out       Outbound
-	Pub       Publisher
-	Clock     clock.Clock
-	Log       *slog.Logger
-	Lanes     *Lanes
-	Services  any // an Tools durchgereicht
+	Store    *Store
+	LLM      llm.Client
+	Tools    *tools.Registry
+	Reviewer policy.Reviewer
+	Memory   MemoryAPI
+	Redactor *vault.Redactor
+	Audit    audit.Logger
+	Out      Outbound
+	Pub      Publisher
+	Clock    clock.Clock
+	Log      *slog.Logger
+	Lanes    *Lanes
+	Services any // an Tools durchgereicht
 	// DefaultTiers: tier → logisches Modell, falls die Fylgja kein Profil hat.
-	DefaultTiers map[string]string
-	MaxSteps     int
-	ToolTimeout  time.Duration
+	DefaultTiers  map[string]string
+	MaxSteps      int
+	ToolTimeout   time.Duration
 	ReviewTimeout time.Duration
-	ImageHosts   []string
+	ImageHosts    []string
 	// OnFinish wird nach erfolgreichem Run aufgerufen (Memory-Extraktion, Usage-Reports).
 	OnFinish func(ctx context.Context, run *Run, final string)
 	// OnFail wird nach endgültigem Fehlschlag/Abbruch aufgerufen (Koordination).

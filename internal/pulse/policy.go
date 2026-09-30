@@ -8,13 +8,13 @@ import (
 
 // Config ist dots.pulse_config.
 type Config struct {
-	IntervalMin      int      `json:"interval_min"` // 0 = aus
-	TopK             int      `json:"top_k"`
-	MaxNudgesPerDay  int      `json:"max_nudges_per_day"`
-	DigestTimes      []string `json:"digest_times"`
-	Feeds            []string `json:"feeds"`
-	Interests        []string `json:"interests"`
-	CriticalChannel  string   `json:"critical_channel"`
+	IntervalMin     int      `json:"interval_min"` // 0 = aus
+	TopK            int      `json:"top_k"`
+	MaxNudgesPerDay int      `json:"max_nudges_per_day"`
+	DigestTimes     []string `json:"digest_times"`
+	Feeds           []string `json:"feeds"`
+	Interests       []string `json:"interests"`
+	CriticalChannel string   `json:"critical_channel"`
 }
 
 // QuietHours ist dots.quiet_hours.

@@ -27,8 +27,8 @@ type Manifest struct {
 
 // Finding ist ein Scanner-Treffer.
 type Finding struct {
-	Rule   string `json:"rule"`
-	Line   int    `json:"line"`
+	Rule    string `json:"rule"`
+	Line    int    `json:"line"`
 	Excerpt string `json:"excerpt"`
 }
 

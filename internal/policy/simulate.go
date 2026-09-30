@@ -2,10 +2,10 @@ package policy
 
 // HistoricalAction ist eine vergangene Aktion inklusive ihrer damaligen Entscheidung.
 type HistoricalAction struct {
-	ID       string   `json:"id"`
-	Action   Action   `json:"action"`
-	Context  Context  `json:"context"`
-	Previous Verdict  `json:"previous"`
+	ID       string  `json:"id"`
+	Action   Action  `json:"action"`
+	Context  Context `json:"context"`
+	Previous Verdict `json:"previous"`
 }
 
 // SimResult vergleicht alte und neue Entscheidung ("Was wäre passiert?", 14.4).

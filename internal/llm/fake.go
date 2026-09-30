@@ -53,7 +53,9 @@ func (s *Scripted) Chat(_ context.Context, req Request, onDelta DeltaFunc) (*Res
 }
 
 // Text ist eine Hilfsfunktion für eine reine Textantwort.
-func Text(s string) Response { return Response{Message: Message{Role: Assistant, Content: s}, FinishReason: "stop"} }
+func Text(s string) Response {
+	return Response{Message: Message{Role: Assistant, Content: s}, FinishReason: "stop"}
+}
 
 // Call ist eine Hilfsfunktion für eine Tool-Call-Antwort.
 func Call(id, name string, args any) Response {

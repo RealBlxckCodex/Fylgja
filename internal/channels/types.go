@@ -9,14 +9,14 @@ import (
 
 // Capabilities einer Plattform.
 type Capabilities struct {
-	Threads         bool          `json:"threads"`
-	Buttons         bool          `json:"buttons"`
-	Edits           bool          `json:"edits"`
-	Voice           bool          `json:"voice"`
-	MaxLen          int           `json:"max_len"`
-	MaxFileBytes    int64         `json:"max_file_bytes"`
-	Dialect         string        `json:"markdown_dialect"` // markdownv2|discord|html|plain
-	EditInterval    time.Duration `json:"edit_interval"`
+	Threads      bool          `json:"threads"`
+	Buttons      bool          `json:"buttons"`
+	Edits        bool          `json:"edits"`
+	Voice        bool          `json:"voice"`
+	MaxLen       int           `json:"max_len"`
+	MaxFileBytes int64         `json:"max_file_bytes"`
+	Dialect      string        `json:"markdown_dialect"` // markdownv2|discord|html|plain
+	EditInterval time.Duration `json:"edit_interval"`
 }
 
 // Target adressiert einen Chat/Thread.
@@ -42,13 +42,13 @@ type Sender struct {
 
 // Attachment eines Inbound-Ereignisses.
 type Attachment struct {
-	Kind     string `json:"kind"` // image|audio|voice|file
-	Name     string `json:"name"`
-	Mime     string `json:"mime"`
-	Size     int64  `json:"size"`
-	URL      string `json:"url,omitempty"`
-	FileID   string `json:"file_id,omitempty"`
-	Data     []byte `json:"-"`
+	Kind   string `json:"kind"` // image|audio|voice|file
+	Name   string `json:"name"`
+	Mime   string `json:"mime"`
+	Size   int64  `json:"size"`
+	URL    string `json:"url,omitempty"`
+	FileID string `json:"file_id,omitempty"`
+	Data   []byte `json:"-"`
 }
 
 // InboundEvent ist das normalisierte Eingangsereignis (9.1).
@@ -93,8 +93,8 @@ type Block struct {
 // Button (Approval-Karten).
 type Button struct {
 	Label string `json:"label"`
-	Data  string `json:"data,omitempty"` // signierte Callback-Daten
-	URL   string `json:"url,omitempty"`  // Deep-Link (Step-up in Web-UI)
+	Data  string `json:"data,omitempty"`  // signierte Callback-Daten
+	URL   string `json:"url,omitempty"`   // Deep-Link (Step-up in Web-UI)
 	Style string `json:"style,omitempty"` // primary|danger|secondary
 }
 
@@ -128,9 +128,9 @@ type ApprovalCard struct {
 
 // Health eines Adapters.
 type Health struct {
-	OK      bool      `json:"ok"`
-	Detail  string    `json:"detail"`
-	Since   time.Time `json:"since"`
+	OK     bool      `json:"ok"`
+	Detail string    `json:"detail"`
+	Since  time.Time `json:"since"`
 }
 
 // InboundHandler verarbeitet eingehende Ereignisse.

@@ -94,7 +94,10 @@ func newFixture(t *testing.T, autonomy int) *fixture {
 	reg.MustRegister(&tools.Tool{Name: "mail.send", Class: policy.Communicate, Base: true, Preview: "Mail an {to}",
 		Schema:  json.RawMessage(`{"type":"object","properties":{"to":{"type":"string"},"body":{"type":"string"}},"required":["to"]}`),
 		Extract: func(a map[string]any) ([]string, string, int64) { s, _ := a["to"].(string); return []string{s}, "", 0 },
-		Handler: func(context.Context, tools.Call) (tools.Result, error) { mailC.Add(1); return tools.Result{Content: "gesendet"}, nil }})
+		Handler: func(context.Context, tools.Call) (tools.Result, error) {
+			mailC.Add(1)
+			return tools.Result{Content: "gesendet"}, nil
+		}})
 	reg.MustRegister(&tools.Tool{Name: "web.fetch", Class: policy.Read, Base: true, Idempotent: true,
 		Schema: json.RawMessage(`{"type":"object","properties":{"url":{"type":"string"}},"required":["url"]}`),
 		Handler: func(context.Context, tools.Call) (tools.Result, error) {

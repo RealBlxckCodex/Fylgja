@@ -29,6 +29,7 @@ import (
 	"github.com/realblxckcodex/fylgja/internal/fleet"
 	"github.com/realblxckcodex/fylgja/internal/fleet/tunnel"
 	"github.com/realblxckcodex/fylgja/internal/learn"
+	"github.com/realblxckcodex/fylgja/internal/link"
 	"github.com/realblxckcodex/fylgja/internal/llm"
 	"github.com/realblxckcodex/fylgja/internal/mcp"
 	"github.com/realblxckcodex/fylgja/internal/memory"
@@ -65,6 +66,7 @@ type App struct {
 	Coord    *coord.Coordinator
 	Learner  *learn.Learner
 	Sandbox  *sandbox.Manager
+	Links    *link.Registry
 	Auth     *auth.Service
 	Passkeys *auth.Passkeys
 	API      *api.Server
@@ -197,6 +199,8 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger, ui http.Handl
 		Escalate: a.escalate,
 	}
 	coord.RegisterTools(a.Tools, a.Coord, pool, 2)
+	a.Links = &link.Registry{Pool: pool}
+	a.Links.RegisterTools(a.Tools)
 	a.Pulse = &pulse.Engine{Pool: pool, Runtime: a.Engine, Memory: a.Memory, Notify: a.Hub, HTTP: httpc, Log: log}
 	a.Learner = &learn.Learner{Pool: pool, LLM: a.Router, Memory: a.Memory, Runtime: a.Engine, Log: log, TriageModel: a.Engine.DefaultTiers["triage"]}
 	a.Engine.OnFinish = func(ctx context.Context, run *runtime.Run, final string) {
@@ -216,7 +220,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger, ui http.Handl
 		log.Warn("passkeys deaktiviert", "err", err)
 	}
 	a.API = &api.Server{Pool: pool, Auth: a.Auth, Passkeys: a.Passkeys, Runtime: a.Engine, Memory: a.Memory, Hub: a.Hub, Bus: a.Bus,
-		Router: a.Router, Fleet: a.Fleet, Tunnel: a.Tunnel, Coord: a.Coord, Pulse: a.Pulse, Tools: a.Tools, Sandbox: a.Sandbox, Audit: a.Audit,
+		Router: a.Router, Fleet: a.Fleet, Tunnel: a.Tunnel, Links: a.Links, Coord: a.Coord, Pulse: a.Pulse, Tools: a.Tools, Sandbox: a.Sandbox, Audit: a.Audit,
 		Keyring: a.Keyring, Redactor: a.Redactor, Log: log, UI: ui, BaseURL: cfg.BaseURL, Secure: strings.HasPrefix(cfg.BaseURL, "https://"),
 		RouterToken: cfg.Router.ExternalToken, HookKey: derive(master, "hooks"), SkillKey: derive(master, "skills"), Version: version}
 	return a, nil

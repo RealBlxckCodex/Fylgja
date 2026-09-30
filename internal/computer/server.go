@@ -37,8 +37,8 @@ type Server struct {
 	Browser []string // Playwright-MCP-Kommando, z. B. ["npx","@playwright/mcp@latest","--headless=false"]
 	Log     *slog.Logger
 
-	mu  sync.Mutex
-	pw  *mcp.Client
+	mu sync.Mutex
+	pw *mcp.Client
 }
 
 func (s *Server) log() *slog.Logger {

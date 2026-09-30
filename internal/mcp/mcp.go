@@ -95,11 +95,11 @@ func (c *Client) Call(ctx context.Context, name string, args any) (string, bool,
 }
 
 var (
-	reRead     = regexp.MustCompile(`(?i)(^|[_.\-])(get|list|search|read|fetch|query|find|lookup|describe|show|view|snapshot|status)($|[_.\-])`)
-	reComm     = regexp.MustCompile(`(?i)(send|post|message|email|mail|reply|comment|notify|publish|tweet|dm)`)
-	reDestroy  = regexp.MustCompile(`(?i)(delete|remove|drop|destroy|purge|wipe|truncate|archive)`)
-	reSpend    = regexp.MustCompile(`(?i)(pay|charge|purchase|buy|order|checkout|transfer|invoice)`)
-	reCred     = regexp.MustCompile(`(?i)(password|credential|secret|2fa|mfa|recovery|api[_-]?key|permission|role|grant)`)
+	reRead    = regexp.MustCompile(`(?i)(^|[_.\-])(get|list|search|read|fetch|query|find|lookup|describe|show|view|snapshot|status)($|[_.\-])`)
+	reComm    = regexp.MustCompile(`(?i)(send|post|message|email|mail|reply|comment|notify|publish|tweet|dm)`)
+	reDestroy = regexp.MustCompile(`(?i)(delete|remove|drop|destroy|purge|wipe|truncate|archive)`)
+	reSpend   = regexp.MustCompile(`(?i)(pay|charge|purchase|buy|order|checkout|transfer|invoice)`)
+	reCred    = regexp.MustCompile(`(?i)(password|credential|secret|2fa|mfa|recovery|api[_-]?key|permission|role|grant)`)
 )
 
 // Classify ordnet ein MCP-Tool konservativ einer Klasse zu.

@@ -152,9 +152,9 @@ func (s *Server) Disconnect(nodeID string) {
 // HTTPClient baut einen http.Client, der über den Tunnel wählt.
 func HTTPClient(dial DialFunc, timeout time.Duration) *http.Client {
 	tr := &http.Transport{
-		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) { return dial(ctx) },
-		MaxIdleConnsPerHost: 32,
-		IdleConnTimeout:     90 * time.Second,
+		DialContext:           func(ctx context.Context, _, _ string) (net.Conn, error) { return dial(ctx) },
+		MaxIdleConnsPerHost:   32,
+		IdleConnTimeout:       90 * time.Second,
 		ResponseHeaderTimeout: timeout,
 	}
 	return &http.Client{Transport: tr}

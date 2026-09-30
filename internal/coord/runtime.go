@@ -74,7 +74,7 @@ func (x *RunExecutor) Start(ctx context.Context, g *Graph, n *Node) (string, err
 	tier := firstNonEmpty(n.Contract.Tier, map[OwnerKind]string{OwnerLead: "planner", OwnerMember: "worker", OwnerWorker: "worker"}[n.OwnerKind])
 	run := &runtime.Run{DotID: dot, TaskID: &task, Kind: runtime.KindTaskStep, Scope: scope, Tier: tier,
 		Input: runtime.Input{Text: sb.String(), Trust: "system", ToolAllowlist: allow, OutputSchema: n.Contract.OutputSchema,
-			Budget: runtime.Budget{Tokens: n.Contract.Budget.Tokens, CostMicroEUR: n.Contract.Budget.CostMicroEUR, WallClockS: n.Contract.Budget.WallClockS},
+			Budget:  runtime.Budget{Tokens: n.Contract.Budget.Tokens, CostMicroEUR: n.Contract.Budget.CostMicroEUR, WallClockS: n.Contract.Budget.WallClockS},
 			Privacy: string(n.Contract.Privacy), Graph: g.ID, Node: n.ID, Depth: 1, NoTools: scope == policy.ScopeNone}}
 	if err := x.Runtime.Submit(ctx, run); err != nil {
 		return "", err
@@ -170,8 +170,8 @@ type PlanArgs struct {
 		Rationale string   `json:"rationale"`
 		Contract  Contract `json:"contract"`
 	} `json:"nodes"`
-	Edges       [][2]string `json:"edges"` // [von, nach] = depends_on
-	BudgetTokens int64      `json:"budget_tokens"`
+	Edges        [][2]string `json:"edges"` // [von, nach] = depends_on
+	BudgetTokens int64       `json:"budget_tokens"`
 }
 
 // RegisterTools registriert die Lead-Werkzeuge (team.plan, team.start, team.status).

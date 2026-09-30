@@ -89,7 +89,9 @@ type ErrBroken struct {
 	Reason string
 }
 
-func (e *ErrBroken) Error() string { return fmt.Sprintf("audit: kette gebrochen bei id=%d: %s", e.ID, e.Reason) }
+func (e *ErrBroken) Error() string {
+	return fmt.Sprintf("audit: kette gebrochen bei id=%d: %s", e.ID, e.Reason)
+}
 
 // Verify prüft eine geordnete Folge von Einträgen.
 func Verify(entries []Entry) error {

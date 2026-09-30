@@ -68,13 +68,13 @@ const (
 
 // Meta trägt Routing-Informationen, die nicht an den Provider gehen.
 type Meta struct {
-	RunID      string   `json:"run_id,omitempty"`
-	DotID      string   `json:"dot_id,omitempty"`
-	WorkspaceID string  `json:"workspace_id,omitempty"`
-	Tier       string   `json:"tier,omitempty"`
-	Priority   Priority `json:"priority,omitempty"`
-	Privacy    Privacy  `json:"privacy,omitempty"`
-	PrefixHash string   `json:"prefix_hash,omitempty"`
+	RunID       string   `json:"run_id,omitempty"`
+	DotID       string   `json:"dot_id,omitempty"`
+	WorkspaceID string   `json:"workspace_id,omitempty"`
+	Tier        string   `json:"tier,omitempty"`
+	Priority    Priority `json:"priority,omitempty"`
+	Privacy     Privacy  `json:"privacy,omitempty"`
+	PrefixHash  string   `json:"prefix_hash,omitempty"`
 	// NoDegrade verbietet Fallback auf schwächere Modelle (Reviewer, 16.6).
 	NoDegrade bool `json:"no_degrade,omitempty"`
 }
@@ -104,10 +104,10 @@ type Response struct {
 	FinishReason string  `json:"finish_reason"`
 	Model        string  `json:"model"`
 	// Deployment, das die Anfrage bedient hat (vom Router gesetzt).
-	Deployment string `json:"deployment,omitempty"`
-	CostMicroEUR int64 `json:"cost_micro_eur,omitempty"`
-	LatencyMS    int   `json:"latency_ms,omitempty"`
-	Degraded     bool  `json:"degraded,omitempty"`
+	Deployment   string `json:"deployment,omitempty"`
+	CostMicroEUR int64  `json:"cost_micro_eur,omitempty"`
+	LatencyMS    int    `json:"latency_ms,omitempty"`
+	Degraded     bool   `json:"degraded,omitempty"`
 }
 
 // DeltaFunc empfängt Text-Deltas beim Streaming. Nil = kein Streaming.
@@ -131,7 +131,9 @@ type APIError struct {
 	BeforeFirstToken bool
 }
 
-func (e *APIError) Error() string { return fmt.Sprintf("llm: http %d: %s", e.Status, truncate(e.Body, 300)) }
+func (e *APIError) Error() string {
+	return fmt.Sprintf("llm: http %d: %s", e.Status, truncate(e.Body, 300))
+}
 
 // Retryable meldet transiente Fehler (Timeout/5xx/429).
 func Retryable(err error) bool {

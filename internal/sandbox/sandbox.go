@@ -67,8 +67,8 @@ type Manager struct {
 	// Credentials entschlüsselt Secrets für browser.login (Broker, 13.8).
 	Credentials func(ctx context.Context, dot, id uuid.UUID) (Credential, error)
 
-	mu       sync.Mutex
-	cache    map[uuid.UUID]*live
+	mu    sync.Mutex
+	cache map[uuid.UUID]*live
 }
 
 type live struct {
@@ -369,6 +369,6 @@ func (s *Static) Name() string { return "static" }
 func (s *Static) Ensure(context.Context, Spec) (Instance, error) {
 	return Instance{Ref: "static", Endpoint: s.Endpoint, VNC: s.VNC, Token: s.Token}, nil
 }
-func (s *Static) Sleep(context.Context, string) error                        { return nil }
-func (s *Static) Destroy(context.Context, string, bool) error                { return nil }
-func (s *Static) Stats(context.Context, string) (map[string]any, error)      { return map[string]any{}, nil }
+func (s *Static) Sleep(context.Context, string) error                   { return nil }
+func (s *Static) Destroy(context.Context, string, bool) error           { return nil }
+func (s *Static) Stats(context.Context, string) (map[string]any, error) { return map[string]any{}, nil }

@@ -72,6 +72,6 @@ func (s *Static) Status(_ context.Context, id string) (ProviderPod, error) {
 	}
 	return ProviderPod{}, ErrNotFound
 }
-func (s *Static) Terminate(context.Context, string) error          { return nil }
-func (s *Static) List(context.Context) ([]ProviderPod, error)      { return nil, nil }
-func (s *Static) ListOffers(context.Context) ([]Offer, error)      { return nil, nil }
+func (s *Static) Terminate(context.Context, string) error     { return nil }
+func (s *Static) List(context.Context) ([]ProviderPod, error) { return nil, nil }
+func (s *Static) ListOffers(context.Context) ([]Offer, error) { return nil, nil }

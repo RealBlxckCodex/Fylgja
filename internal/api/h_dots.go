@@ -115,14 +115,14 @@ func (s *Server) patchDot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Name        *string          `json:"name"`
-		Persona     *string          `json:"persona"`
-		Charter     *string          `json:"charter"`
-		Autonomy    *int             `json:"autonomy_level"`
-		Privacy     *string          `json:"privacy_mode"`
-		PulseConfig *json.RawMessage `json:"pulse_config"`
-		QuietHours  *json.RawMessage `json:"quiet_hours"`
-		Status      *string          `json:"status"`
+		Name        *string           `json:"name"`
+		Persona     *string           `json:"persona"`
+		Charter     *string           `json:"charter"`
+		Autonomy    *int              `json:"autonomy_level"`
+		Privacy     *string           `json:"privacy_mode"`
+		PulseConfig *json.RawMessage  `json:"pulse_config"`
+		QuietHours  *json.RawMessage  `json:"quiet_hours"`
+		Status      *string           `json:"status"`
 		Tiers       map[string]string `json:"tiers"`
 	}
 	if err := decode(r, &in); err != nil {

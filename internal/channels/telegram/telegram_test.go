@@ -14,10 +14,10 @@ import (
 )
 
 type mock struct {
-	mu    sync.Mutex
-	calls []string
-	sent  []map[string]any
-	ups   []string
+	mu        sync.Mutex
+	calls     []string
+	sent      []map[string]any
+	ups       []string
 	failParse bool
 }
 

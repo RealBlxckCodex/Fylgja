@@ -9,12 +9,12 @@ func TestCron(t *testing.T) {
 	loc, _ := time.LoadLocation("Europe/Berlin")
 	base := time.Date(2026, 9, 30, 21, 15, 0, 0, loc) // Mittwoch
 	cases := map[string]time.Time{
-		"0 8 * * 1":     time.Date(2026, 10, 5, 8, 0, 0, 0, loc),
-		"*/15 * * * *":  time.Date(2026, 9, 30, 21, 30, 0, 0, loc),
-		"30 7 1 * *":    time.Date(2026, 10, 1, 7, 30, 0, 0, loc),
+		"0 8 * * 1":      time.Date(2026, 10, 5, 8, 0, 0, 0, loc),
+		"*/15 * * * *":   time.Date(2026, 9, 30, 21, 30, 0, 0, loc),
+		"30 7 1 * *":     time.Date(2026, 10, 1, 7, 30, 0, 0, loc),
 		"0 9-17/4 * * *": time.Date(2026, 10, 1, 9, 0, 0, 0, loc),
-		"0 0 * * 0":     time.Date(2026, 10, 4, 0, 0, 0, 0, loc),
-		"0 0 * * 7":     time.Date(2026, 10, 4, 0, 0, 0, 0, loc),
+		"0 0 * * 0":      time.Date(2026, 10, 4, 0, 0, 0, 0, loc),
+		"0 0 * * 7":      time.Date(2026, 10, 4, 0, 0, 0, 0, loc),
 	}
 	for expr, want := range cases {
 		c, err := ParseCron(expr)

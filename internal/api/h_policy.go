@@ -166,8 +166,8 @@ func (s *Server) simulateRules(w http.ResponseWriter, r *http.Request) {
 		var args map[string]any
 		_ = json.Unmarshal(c.Args, &args)
 		hist = append(hist, policy.HistoricalAction{ID: run.String() + ":" + itoa(seq),
-			Action:  policy.Action{Tool: c.Tool, Class: policy.Class(c.Class), Args: args},
-			Context: policy.Context{DotID: dot.String(), Autonomy: autonomy, Tainted: tainted, Trigger: kind, Scope: policy.Scope(scope)},
+			Action:   policy.Action{Tool: c.Tool, Class: policy.Class(c.Class), Args: args},
+			Context:  policy.Context{DotID: dot.String(), Autonomy: autonomy, Tainted: tainted, Trigger: kind, Scope: policy.Scope(scope)},
 			Previous: p.Decision.Verdict})
 	}
 	rows.Close()

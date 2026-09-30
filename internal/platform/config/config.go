@@ -25,12 +25,12 @@ type Config struct {
 	MasterKey     string `yaml:"-"`
 	MasterKeyFile string `yaml:"master_key_file"`
 
-	Auth     Auth           `yaml:"auth"`
-	Channels Channels       `yaml:"channels"`
-	Router   Router         `yaml:"router"`
-	Fleet    Fleet          `yaml:"fleet"`
-	Sandbox  Sandbox        `yaml:"sandbox"`
-	Runtime  Runtime        `yaml:"runtime"`
+	Auth     Auth            `yaml:"auth"`
+	Channels Channels        `yaml:"channels"`
+	Router   Router          `yaml:"router"`
+	Fleet    Fleet           `yaml:"fleet"`
+	Sandbox  Sandbox         `yaml:"sandbox"`
+	Runtime  Runtime         `yaml:"runtime"`
 	Features map[string]bool `yaml:"features"`
 }
 
@@ -49,7 +49,7 @@ type Channels struct {
 
 type TelegramCfg struct {
 	Enabled       bool   `yaml:"enabled"`
-	Token         string `yaml:"-"` // FYLGJA_TELEGRAM_TOKEN (nur Erststart, danach Vault)
+	Token         string `yaml:"-"`    // FYLGJA_TELEGRAM_TOKEN (nur Erststart, danach Vault)
 	Mode          string `yaml:"mode"` // polling|webhook
 	WebhookSecret string `yaml:"-"`
 	APIBase       string `yaml:"api_base"`
@@ -80,20 +80,20 @@ type ModelSeed struct {
 }
 
 type DeploymentSeed struct {
-	Name           string  `yaml:"name"`
-	Model          string  `yaml:"model"`
-	Provider       string  `yaml:"provider"` // runpod|local|external
-	Engine         string  `yaml:"engine"`   // vllm|ollama|llamacpp|remote_api
-	Endpoint       string  `yaml:"endpoint"`
-	ServedModel    string  `yaml:"served_model"`
-	APIKeyEnv      string  `yaml:"api_key_env"`
-	Kind           string  `yaml:"kind"` // openai|anthropic
-	MaxConcurrency int     `yaml:"max_concurrency"`
-	Weight         float64 `yaml:"weight"`
-	Region         string  `yaml:"region"`
-	PriceInPerMTok  int64  `yaml:"price_in_micro_eur_per_mtok"`
-	PriceOutPerMTok int64  `yaml:"price_out_micro_eur_per_mtok"`
-	CostPerHour     int64  `yaml:"cost_per_hour_micro_eur"`
+	Name            string  `yaml:"name"`
+	Model           string  `yaml:"model"`
+	Provider        string  `yaml:"provider"` // runpod|local|external
+	Engine          string  `yaml:"engine"`   // vllm|ollama|llamacpp|remote_api
+	Endpoint        string  `yaml:"endpoint"`
+	ServedModel     string  `yaml:"served_model"`
+	APIKeyEnv       string  `yaml:"api_key_env"`
+	Kind            string  `yaml:"kind"` // openai|anthropic
+	MaxConcurrency  int     `yaml:"max_concurrency"`
+	Weight          float64 `yaml:"weight"`
+	Region          string  `yaml:"region"`
+	PriceInPerMTok  int64   `yaml:"price_in_micro_eur_per_mtok"`
+	PriceOutPerMTok int64   `yaml:"price_out_micro_eur_per_mtok"`
+	CostPerHour     int64   `yaml:"cost_per_hour_micro_eur"`
 }
 
 type Fleet struct {
@@ -114,9 +114,9 @@ type PodTemplate struct {
 }
 
 type Sandbox struct {
-	Provider string       `yaml:"provider"` // docker-gvisor|none
-	Hosts    []SandboxHost `yaml:"hosts"`
-	Image    string       `yaml:"image"`
+	Provider  string        `yaml:"provider"` // docker-gvisor|none
+	Hosts     []SandboxHost `yaml:"hosts"`
+	Image     string        `yaml:"image"`
 	IdleSleep time.Duration `yaml:"idle_sleep"`
 }
 

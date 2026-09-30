@@ -184,7 +184,10 @@ func TestPriorityAndReserve(t *testing.T) {
 	// Background darf nur 7 von 10 Slots nutzen (30 % Reserve).
 	for i := 0; i < 9; i++ {
 		wg.Add(1)
-		go func() { defer wg.Done(); r.Chat(ctx, llm.Request{Model: "worker", Meta: llm.Meta{Priority: llm.Background}}, nil) }()
+		go func() {
+			defer wg.Done()
+			r.Chat(ctx, llm.Request{Model: "worker", Meta: llm.Meta{Priority: llm.Background}}, nil)
+		}()
 	}
 	time.Sleep(50 * time.Millisecond)
 	if got := n.inflight.Load(); got != 7 {
@@ -226,7 +229,10 @@ func TestFairShare(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := 0; i < 12; i++ {
 		wg.Add(1)
-		go func() { defer wg.Done(); r.Chat(ctx, llm.Request{Model: "worker", Meta: llm.Meta{Priority: llm.Interactive, DotID: "hog"}}, nil) }()
+		go func() {
+			defer wg.Done()
+			r.Chat(ctx, llm.Request{Model: "worker", Meta: llm.Meta{Priority: llm.Interactive, DotID: "hog"}}, nil)
+		}()
 	}
 	time.Sleep(50 * time.Millisecond)
 	got := make(chan error, 1)

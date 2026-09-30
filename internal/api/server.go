@@ -28,6 +28,7 @@ import (
 	"github.com/realblxckcodex/fylgja/internal/events"
 	"github.com/realblxckcodex/fylgja/internal/fleet"
 	"github.com/realblxckcodex/fylgja/internal/fleet/tunnel"
+	"github.com/realblxckcodex/fylgja/internal/link"
 	"github.com/realblxckcodex/fylgja/internal/memory"
 	"github.com/realblxckcodex/fylgja/internal/pulse"
 	"github.com/realblxckcodex/fylgja/internal/router"
@@ -39,31 +40,32 @@ import (
 
 // Server bündelt alle Abhängigkeiten der API.
 type Server struct {
-	Pool      *pgxpool.Pool
-	Auth      *auth.Service
-	Passkeys  *auth.Passkeys
-	Runtime   *runtime.Engine
-	Memory    *memory.Service
-	Hub       *channels.Hub
-	Bus       *events.Bus
-	Router    *router.Router
-	Fleet     *fleet.Manager
-	Tunnel    *tunnel.Server
-	Coord     *coord.Coordinator
-	Pulse     *pulse.Engine
-	Tools     *tools.Registry
-	Sandbox   *sandbox.Manager
-	Audit     *audit.PG
-	Keyring   *vault.Keyring
-	Redactor  *vault.Redactor
-	Log       *slog.Logger
-	UI        http.Handler // eingebettete Web-UI
-	BaseURL   string
-	Secure    bool   // Secure-Cookies (https)
+	Pool        *pgxpool.Pool
+	Auth        *auth.Service
+	Passkeys    *auth.Passkeys
+	Runtime     *runtime.Engine
+	Memory      *memory.Service
+	Hub         *channels.Hub
+	Bus         *events.Bus
+	Router      *router.Router
+	Fleet       *fleet.Manager
+	Tunnel      *tunnel.Server
+	Links       *link.Registry
+	Coord       *coord.Coordinator
+	Pulse       *pulse.Engine
+	Tools       *tools.Registry
+	Sandbox     *sandbox.Manager
+	Audit       *audit.PG
+	Keyring     *vault.Keyring
+	Redactor    *vault.Redactor
+	Log         *slog.Logger
+	UI          http.Handler // eingebettete Web-UI
+	BaseURL     string
+	Secure      bool   // Secure-Cookies (https)
 	RouterToken string // /router/v1 (leer = deaktiviert)
-	HookKey   []byte // HMAC-Basis für Webhooks
-	SkillKey  []byte // Basis für Skill-Signaturen
-	Version   string
+	HookKey     []byte // HMAC-Basis für Webhooks
+	SkillKey    []byte // Basis für Skill-Signaturen
+	Version     string
 
 	idem    sync.Map
 	limiter *limiter
@@ -302,6 +304,9 @@ func (s *Server) Handler() http.Handler {
 	r.Post("/hooks/{dot}/{source}", s.webhook)
 	if s.Tunnel != nil {
 		r.Handle("/api/v1/node/tunnel", s.Tunnel)
+	}
+	if s.Links != nil {
+		r.Handle("/api/v1/link/tunnel", s.Links.Server())
 	}
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/setup/status", s.setupStatus)

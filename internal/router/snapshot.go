@@ -34,22 +34,22 @@ func (r *ringbuf) pct(p float64) float64 {
 // DeploymentView ist die UI-Sicht auf ein Deployment (18.5 C).
 type DeploymentView struct {
 	Deployment
-	Inflight   int     `json:"inflight"`
-	NodeQueued int     `json:"node_queued"`
-	LatencyP95 float64 `json:"latency_p95_ms"`
-	KVUtil     float64 `json:"kv_cache_util"`
-	Breaker    string  `json:"breaker"`
-	Served     int64   `json:"served"`
-	Errors     int64   `json:"errors"`
+	Inflight   int            `json:"inflight"`
+	NodeQueued int            `json:"node_queued"`
+	LatencyP95 float64        `json:"latency_p95_ms"`
+	KVUtil     float64        `json:"kv_cache_util"`
+	Breaker    string         `json:"breaker"`
+	Served     int64          `json:"served"`
+	Errors     int64          `json:"errors"`
 	ByDot      map[string]int `json:"by_dot"`
 }
 
 // QueueView: Warteschlange je Prioritätsklasse.
 type QueueView struct {
-	Class  llm.Priority `json:"class"`
-	Depth  int          `json:"depth"`
-	WaitP50 float64     `json:"wait_p50_ms"`
-	WaitP95 float64     `json:"wait_p95_ms"`
+	Class   llm.Priority `json:"class"`
+	Depth   int          `json:"depth"`
+	WaitP50 float64      `json:"wait_p50_ms"`
+	WaitP95 float64      `json:"wait_p95_ms"`
 }
 
 // Snapshot liefert den aktuellen Zustand für UI und Metriken.

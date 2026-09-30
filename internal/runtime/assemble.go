@@ -44,11 +44,11 @@ func Tokens(s string) int { return (len(s) + 3) / 4 }
 
 // Identity beschreibt die Fylgja (Schicht 2).
 type Identity struct {
-	Name     string
-	Persona  string
-	Charter  string
-	Language string
-	Timezone string
+	Name      string
+	Persona   string
+	Charter   string
+	Language  string
+	Timezone  string
 	OwnerName string
 }
 

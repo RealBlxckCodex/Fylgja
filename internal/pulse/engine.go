@@ -53,13 +53,13 @@ func (e *Engine) log() *slog.Logger {
 
 // Signal ist ein gesammeltes Signal.
 type Signal struct {
-	ID       uuid.UUID      `json:"id"`
-	Source   string         `json:"source"`
-	Kind     string         `json:"kind"`
-	DedupKey string         `json:"dedup_key"`
-	Payload  map[string]any `json:"payload"`
-	Score    float64        `json:"score"`
-	Untrusted bool          `json:"untrusted"`
+	ID        uuid.UUID      `json:"id"`
+	Source    string         `json:"source"`
+	Kind      string         `json:"kind"`
+	DedupKey  string         `json:"dedup_key"`
+	Payload   map[string]any `json:"payload"`
+	Score     float64        `json:"score"`
+	Untrusted bool           `json:"untrusted"`
 }
 
 // AddSignal speichert ein Signal (dedupliziert über dot/source/dedup_key).
@@ -116,10 +116,10 @@ func (e *Engine) Collect(ctx context.Context, dot *runtime.Dot, cfg Config) int 
 
 type feed struct {
 	Items []struct {
-		Title   string `xml:"title"`
-		Link    string `xml:"link"`
-		GUID    string `xml:"guid"`
-		Desc    string `xml:"description"`
+		Title string `xml:"title"`
+		Link  string `xml:"link"`
+		GUID  string `xml:"guid"`
+		Desc  string `xml:"description"`
 	} `xml:"channel>item"`
 	Entries []struct {
 		Title string `xml:"title"`
@@ -399,10 +399,10 @@ func (e *Engine) runRoutines(ctx context.Context, now time.Time) {
 		return
 	}
 	type sched struct {
-		id, dot     uuid.UUID
+		id, dot                 uuid.UUID
 		cron, prompt, scope, tz string
-		target      []byte
-		next        *time.Time
+		target                  []byte
+		next                    *time.Time
 	}
 	var list []sched
 	for rows.Next() {

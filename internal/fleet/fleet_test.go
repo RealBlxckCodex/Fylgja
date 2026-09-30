@@ -14,9 +14,9 @@ import (
 )
 
 type fakeProv struct {
-	mu   sync.Mutex
-	pods map[string]ProviderPod
-	n    int
+	mu         sync.Mutex
+	pods       map[string]ProviderPod
+	n          int
 	terminated []string
 }
 
@@ -60,7 +60,7 @@ func (f *fakeProv) List(context.Context) ([]ProviderPod, error) {
 func (f *fakeProv) ListOffers(context.Context) ([]Offer, error) { return nil, nil }
 
 type hook struct {
-	mu                  sync.Mutex
+	mu                   sync.Mutex
 	ready, drained, gone []string
 }
 

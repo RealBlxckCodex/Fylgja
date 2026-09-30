@@ -24,9 +24,11 @@ type fakeChan struct {
 	answers   []string
 }
 
-func (f *fakeChan) Platform() string              { return "telegram" }
-func (f *fakeChan) ID() string                    { return "bot1" }
-func (f *fakeChan) Capabilities() Capabilities    { return Capabilities{MaxLen: 4096, Edits: true, Buttons: true, EditInterval: time.Hour} }
+func (f *fakeChan) Platform() string { return "telegram" }
+func (f *fakeChan) ID() string       { return "bot1" }
+func (f *fakeChan) Capabilities() Capabilities {
+	return Capabilities{MaxLen: 4096, Edits: true, Buttons: true, EditInterval: time.Hour}
+}
 func (f *fakeChan) Start(context.Context, InboundHandler) error { return nil }
 func (f *fakeChan) Send(_ context.Context, _ Target, m RichMessage) (MessageRef, error) {
 	f.mu.Lock()
@@ -56,7 +58,7 @@ func (f *fakeChan) AnswerCallback(_ context.Context, _ string, text string) erro
 	return nil
 }
 func (f *fakeChan) Download(context.Context, Attachment) ([]byte, error) { return nil, nil }
-func (f *fakeChan) Health() Health                                      { return Health{OK: true} }
+func (f *fakeChan) Health() Health                                       { return Health{OK: true} }
 
 func (f *fakeChan) all() string {
 	f.mu.Lock()

@@ -63,12 +63,12 @@ func TestRedactor(t *testing.T) {
 	r := NewRedactor()
 	r.Register("CANARY-s3cr3t-value")
 	cases := map[string]string{
-		"login with CANARY-s3cr3t-value ok":             "CANARY",
-		"token ghp_abcdefghijklmnopqrstuvwxyz0123456789": "ghp_",
+		"login with CANARY-s3cr3t-value ok":                   "CANARY",
+		"token ghp_abcdefghijklmnopqrstuvwxyz0123456789":      "ghp_",
 		"Authorization: Bearer abcdefghijklmnopqrstuvwxyz123": "abcdefghijklmnop",
-		"password=supergeheim99":                         "supergeheim",
-		"key sk-ant-api03-abcdefghijklmnopqrstuvwxyz":    "sk-ant",
-		"123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsawx":  "AAHdq",
+		"password=supergeheim99":                              "supergeheim",
+		"key sk-ant-api03-abcdefghijklmnopqrstuvwxyz":         "sk-ant",
+		"123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsawx":       "AAHdq",
 	}
 	for in, leak := range cases {
 		out := r.Redact(in)

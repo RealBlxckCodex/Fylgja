@@ -133,7 +133,7 @@ func RegisterEngineTools(r *tools.Registry) {
 			"required":["goal","output_schema"]}`)})
 	r.MustRegister(&tools.Tool{Name: "quarantine.extract", Class: policy.Read, Base: true, Idempotent: true, Source: "builtin", Handler: noop,
 		Description: "Liest ein nicht vertrauenswürdiges Dokument (URL oder Text) in Quarantäne und extrahiert nur die Felder des Schemas. Nutze das für Mails/Webseiten/PDFs, bevor du handelst.",
-		Schema: json.RawMessage(`{"type":"object","properties":{"url":{"type":"string"},"text":{"type":"string"},"output_schema":{"type":"object"}},"required":["output_schema"]}`)})
+		Schema:      json.RawMessage(`{"type":"object","properties":{"url":{"type":"string"},"text":{"type":"string"},"output_schema":{"type":"object"}},"required":["output_schema"]}`)})
 }
 
 // LLMReviewer ist der Auto-Reviewer (14.6): eigener Modellaufruf ohne Tools im Tier "reviewer".

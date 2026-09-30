@@ -14,11 +14,11 @@ import (
 
 // Docker ist der Provider "docker-gvisor" (Docker Engine API, Runtime runsc).
 type Docker struct {
-	Host       string // unix:///var/run/docker.sock oder tcp://host:2376
-	Runtime    string // runsc (gVisor); leer = Docker-Default (nur Entwicklung)
-	Network    string // internes Netz ohne Default-Route; Ausgang nur über egressd
+	Host        string // unix:///var/run/docker.sock oder tcp://host:2376
+	Runtime     string // runsc (gVisor); leer = Docker-Default (nur Entwicklung)
+	Network     string // internes Netz ohne Default-Route; Ausgang nur über egressd
 	EgressProxy string // http://egressd:3128
-	HTTP       *http.Client
+	HTTP        *http.Client
 }
 
 func (d *Docker) Name() string { return "docker-gvisor" }
@@ -95,11 +95,11 @@ func (d *Docker) ContainerConfig(s Spec) map[string]any {
 		host["Runtime"] = d.Runtime
 	}
 	return map[string]any{
-		"Image":      s.Image,
-		"Env":        env,
-		"User":       "1000:1000",
-		"Labels":     map[string]string{"fylgja.dot": s.DotID.String(), "fylgja.egress": s.Egress},
-		"HostConfig": host,
+		"Image":        s.Image,
+		"Env":          env,
+		"User":         "1000:1000",
+		"Labels":       map[string]string{"fylgja.dot": s.DotID.String(), "fylgja.egress": s.Egress},
+		"HostConfig":   host,
 		"ExposedPorts": map[string]any{"7070/tcp": map[string]any{}, "6080/tcp": map[string]any{}},
 	}
 }
@@ -107,8 +107,8 @@ func (d *Docker) ContainerConfig(s Spec) map[string]any {
 func (d *Docker) Ensure(ctx context.Context, s Spec) (Instance, error) {
 	n := name(s)
 	var info struct {
-		ID    string
-		State struct{ Running bool }
+		ID              string
+		State           struct{ Running bool }
 		NetworkSettings struct {
 			Networks map[string]struct{ IPAddress string }
 		}

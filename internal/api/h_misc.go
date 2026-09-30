@@ -50,6 +50,9 @@ func (s *Server) routes(r chi.Router) {
 	r.With(need("work")).Delete("/memory/{mid}", s.deleteMemory)
 	r.Get("/dots/{id}/computer", s.computerSession)
 	r.Handle("/dots/{id}/computer/vnc/*", s.vncProxy())
+	r.Get("/dots/{id}/links", s.listLinks)
+	r.With(need("work"), stepUp).Post("/dots/{id}/links", s.createLink)
+	r.With(need("work")).Delete("/links/{id}", s.revokeLink)
 	r.Get("/runs/{id}", s.getRun)
 	r.With(need("work")).Post("/runs/{id}/steer", s.steerRun)
 	r.With(need("work")).Post("/runs/{id}/cancel", s.cancelRun)
@@ -352,10 +355,10 @@ func (s *Server) routerGateway() http.Handler {
 			return
 		}
 		var in struct {
-			Model    string        `json:"model"`
-			Messages []llm.Message `json:"messages"`
-			Stream   bool          `json:"stream"`
-			MaxTokens int          `json:"max_tokens"`
+			Model     string        `json:"model"`
+			Messages  []llm.Message `json:"messages"`
+			Stream    bool          `json:"stream"`
+			MaxTokens int           `json:"max_tokens"`
 		}
 		if err := json.NewDecoder(io.LimitReader(req.Body, 8<<20)).Decode(&in); err != nil {
 			problem(w, 400, err.Error())
@@ -558,3 +561,72 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 }
 
 var _ = audit.Entry{}
+
+// ---- Laptop-Link ----
+
+func (s *Server) listLinks(w http.ResponseWriter, r *http.Request) {
+	id, err := pathUUID(r, "id")
+	if err != nil || s.dotInWorkspace(r, id) != nil {
+		problem(w, 404, "nicht gefunden")
+		return
+	}
+	rows, err := s.Pool.Query(r.Context(), `SELECT id, name, capabilities, last_seen, revoked_at, created_at FROM links WHERE dot_id=$1 ORDER BY created_at DESC`, id)
+	if err != nil {
+		problem(w, 500, err.Error())
+		return
+	}
+	defer rows.Close()
+	out := []map[string]any{}
+	for rows.Next() {
+		var lid uuid.UUID
+		var name string
+		var caps []byte
+		var seen, revoked *time.Time
+		var created time.Time
+		_ = rows.Scan(&lid, &name, &caps, &seen, &revoked, &created)
+		online := seen != nil && time.Since(*seen) < 45*time.Second && revoked == nil
+		out = append(out, map[string]any{"id": lid, "name": name, "capabilities": json.RawMessage(caps), "last_seen": seen, "revoked_at": revoked, "online": online, "created_at": created})
+	}
+	writeJSON(w, 200, out)
+}
+
+func (s *Server) createLink(w http.ResponseWriter, r *http.Request) {
+	id, err := pathUUID(r, "id")
+	if err != nil || s.dotInWorkspace(r, id) != nil || s.Links == nil {
+		problem(w, 404, "nicht gefunden")
+		return
+	}
+	var in struct {
+		Name string `json:"name"`
+	}
+	_ = decode(r, &in)
+	p := principal(r)
+	lid, tok, err := s.Links.Create(r.Context(), p.WorkspaceID, p.UserID, id, firstNonEmpty(in.Name, "Laptop"))
+	if err != nil {
+		problem(w, 500, err.Error())
+		return
+	}
+	s.audit(r, "link.create", lid.String(), map[string]any{"dot": id})
+	url := strings.Replace(strings.Replace(s.BaseURL, "https://", "wss://", 1), "http://", "ws://", 1) + "/api/v1/link/tunnel"
+	writeJSON(w, 201, map[string]any{"id": lid, "token": tok, "server": url,
+		"command": fmt.Sprintf("fylgja-link -server %s -id %s -token %s", url, lid, tok), "hint": "Token wird nur einmal angezeigt."})
+}
+
+func (s *Server) revokeLink(w http.ResponseWriter, r *http.Request) {
+	id, err := pathUUID(r, "id")
+	if err != nil || s.Links == nil {
+		problem(w, 404, "nicht gefunden")
+		return
+	}
+	var dot uuid.UUID
+	if s.Pool.QueryRow(r.Context(), `SELECT dot_id FROM links WHERE id=$1`, id).Scan(&dot) != nil || s.dotInWorkspace(r, dot) != nil {
+		problem(w, 404, "nicht gefunden")
+		return
+	}
+	if err := s.Links.Revoke(r.Context(), id); err != nil {
+		problem(w, 500, err.Error())
+		return
+	}
+	s.audit(r, "link.revoke", id.String(), nil)
+	writeJSON(w, 200, map[string]any{"ok": true})
+}
