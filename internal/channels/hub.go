@@ -526,6 +526,9 @@ func (h *Hub) Final(ctx context.Context, run *runtime.Run, text string) error {
 	s := h.streams[run.ID]
 	delete(h.streams, run.ID)
 	h.mu.Unlock()
+	if !ok && (run.Kind == runtime.KindRoutine || run.Kind == runtime.KindTaskStep) {
+		t, ok = h.ownerTarget(ctx, run.DotID)
+	}
 	if !ok {
 		return nil // Web-Kanal: Zustellung über SSE
 	}
