@@ -47,13 +47,15 @@ const (
 )
 
 type desktopReq struct {
-	X, Y   *int   `json:"x,omitempty"`
-	ToX    *int   `json:"to_x,omitempty"`
-	ToY    *int   `json:"to_y,omitempty"`
-	Text   string `json:"text,omitempty"`
-	Keys   string `json:"keys,omitempty"`
-	DX, DY int    `json:"dx,omitempty"`
-	Ms     int    `json:"ms,omitempty"`
+	X    *int   `json:"x,omitempty"`
+	Y    *int   `json:"y,omitempty"`
+	ToX  *int   `json:"to_x,omitempty"`
+	ToY  *int   `json:"to_y,omitempty"`
+	Text string `json:"text,omitempty"`
+	Keys string `json:"keys,omitempty"`
+	DX   int    `json:"dx,omitempty"`
+	DY   int    `json:"dy,omitempty"`
+	Ms   int    `json:"ms,omitempty"`
 }
 
 type desktopResp struct {

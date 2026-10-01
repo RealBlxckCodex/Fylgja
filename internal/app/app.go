@@ -161,6 +161,9 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger, ui http.Handl
 			host = cfg.Sandbox.Hosts[0].Endpoint
 		}
 		a.Sandbox.Provider = &sandbox.Docker{Host: host, Runtime: rt, Network: envOr("FYLGJA_SANDBOX_NETWORK", "fylgja-sandbox"), EgressProxy: envOr("FYLGJA_EGRESS_PROXY", "http://egressd:3128")}
+	case "firecracker":
+		fc := cfg.Sandbox.Firecracker
+		a.Sandbox.Provider = &sandbox.Firecracker{Binary: fc.Binary, Kernel: fc.Kernel, Rootfs: fc.Rootfs, DataDir: fc.DataDir, HomeMB: fc.HomeMB, Subnet: fc.Subnet}
 	case "static":
 		if len(cfg.Sandbox.Hosts) > 0 {
 			a.Sandbox.Provider = &sandbox.Static{Endpoint: cfg.Sandbox.Hosts[0].Endpoint, Token: os.Getenv("FYLGJA_COMPUTERD_TOKEN")}

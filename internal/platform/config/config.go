@@ -138,10 +138,21 @@ type PodTemplate struct {
 }
 
 type Sandbox struct {
-	Provider  string        `yaml:"provider"` // docker-gvisor|none
-	Hosts     []SandboxHost `yaml:"hosts"`
-	Image     string        `yaml:"image"`
-	IdleSleep time.Duration `yaml:"idle_sleep"`
+	Provider    string        `yaml:"provider"` // docker-gvisor|firecracker|static|none
+	Firecracker Firecracker   `yaml:"firecracker"`
+	Hosts       []SandboxHost `yaml:"hosts"`
+	Image       string        `yaml:"image"`
+	IdleSleep   time.Duration `yaml:"idle_sleep"`
+}
+
+// Firecracker: microVM pro Fylgja (KVM nötig, siehe deploy/firecracker/README.md).
+type Firecracker struct {
+	Binary  string `yaml:"binary"`
+	Kernel  string `yaml:"kernel"`
+	Rootfs  string `yaml:"rootfs"`
+	DataDir string `yaml:"data_dir"`
+	HomeMB  int    `yaml:"home_mb"`
+	Subnet  string `yaml:"subnet"`
 }
 
 type SandboxHost struct {
@@ -229,6 +240,12 @@ func (c Config) Validate() error {
 	}
 	if !validRoles[c.Role] {
 		errs = append(errs, fmt.Errorf("role %q ungültig", c.Role))
+	}
+	if c.Sandbox.Provider == "firecracker" {
+		fc := c.Sandbox.Firecracker
+		if fc.Kernel == "" || fc.Rootfs == "" || fc.DataDir == "" {
+			errs = append(errs, errors.New("sandbox.firecracker braucht kernel, rootfs und data_dir"))
+		}
 	}
 	if c.Fleet.RequireMTLS && (c.TLS.CertFile == "" || c.TLS.KeyFile == "") {
 		errs = append(errs, errors.New("fleet.require_mtls braucht tls.cert_file und tls.key_file (der Control Plane muss TLS selbst terminieren)"))

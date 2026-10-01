@@ -1,0 +1,55 @@
+#!/bin/sh
+# PID 1 in der Fylgja-microVM. Das Root-Image ist schreibgeschützt (/dev/vda); beschreibbar sind nur
+# tmpfs (/tmp, /var, /run) und das Home-Image (/dev/vdb). Die Konfiguration kommt per Kernel-Kommandozeile
+# (fylgja.cfg=<base64url-JSON>: token, proxy, egress).
+set -eu
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+mount -t proc proc /proc
+mount -t sysfs sys /sys
+mount -t devtmpfs dev /dev 2>/dev/null || true
+mkdir -p /dev/pts /dev/shm
+mount -t devpts devpts /dev/pts
+mount -t tmpfs -o mode=1777,size=1g tmpfs /tmp
+mount -t tmpfs -o mode=0755,size=256m tmpfs /run
+mount -t tmpfs -o mode=0755,size=512m tmpfs /var
+mkdir -p /var/log /var/tmp /run/fylgja /tmp/.X11-unix
+chmod 1777 /tmp/.X11-unix /var/tmp
+
+# Home auf das persistente Image.
+mount -t ext4 -o noatime,nodev,nosuid /dev/vdb /home/dot
+chown 1000:1000 /home/dot
+
+hostname fylgja-dot
+ip link set lo up 2>/dev/null || true
+
+CFG="$(tr ' ' '\n' </proc/cmdline | sed -n 's/^fylgja\.cfg=//p')"
+JSON="$(printf '%s' "$CFG" | tr '_-' '/+' | base64 -d 2>/dev/null || true)"
+get() { printf '%s' "$JSON" | jq -r ".$1 // empty"; }
+TOKEN="$(get token)"; PROXY="$(get proxy)"; EGRESS="$(get egress)"
+[ -n "$TOKEN" ] || { echo "fylgja-init: kein token in der Kommandozeile" >&2; echo o >/proc/sysrq-trigger; }
+
+{
+  echo "export COMPUTERD_TOKEN='$TOKEN'"
+  echo "export COMPUTERD_LISTEN=':7070'"
+  echo "export HOME=/home/dot DISPLAY=:1"
+  if [ -n "$PROXY" ]; then
+    echo "export HTTP_PROXY='$PROXY' HTTPS_PROXY='$PROXY' http_proxy='$PROXY' https_proxy='$PROXY'"
+    echo "export NO_PROXY='localhost,127.0.0.1'"
+  fi
+} >/run/fylgja/env
+chmod 0600 /run/fylgja/env
+chown 1000:1000 /run/fylgja/env
+echo "fylgja-init: egress=$EGRESS" >/dev/console 2>/dev/null || true
+
+# Herunterfahren: Ctrl-Alt-Del (Sleep) bzw. Ende von computerd → Home sauber aushängen, dann ausschalten.
+poweroff_now() { sync; umount /home/dot 2>/dev/null || true; echo 1 >/proc/sys/kernel/sysrq 2>/dev/null || true; echo o >/proc/sysrq-trigger; sleep 5; }
+CHILD=""
+trap 'if [ -n "$CHILD" ]; then kill -TERM "$CHILD" 2>/dev/null || true; sleep 2; fi; poweroff_now' INT TERM
+
+# Desktop und computerd als Benutzer "dot" (uid 1000). Der Token steht nur in der Umgebung dieses Prozesses.
+setpriv --reuid=1000 --regid=1000 --init-groups --inh-caps=-all --bounding-set=-all --no-new-privs \
+  /bin/bash -c '. /run/fylgja/env && exec /usr/local/bin/entrypoint.sh' &
+CHILD=$!
+while kill -0 "$CHILD" 2>/dev/null; do wait "$CHILD" || true; done
+poweroff_now

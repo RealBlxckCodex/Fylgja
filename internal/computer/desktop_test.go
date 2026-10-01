@@ -2,6 +2,7 @@ package computer
 
 import (
 	"context"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -95,5 +96,36 @@ func TestScreenshot(t *testing.T) {
 	res, err := s.desktopAction(context.Background(), "screenshot", desktopReq{})
 	if err != nil || !strings.HasPrefix(res.Image, "data:image/jpeg;base64,") || res.Width != 1024 || res.Height != 768 {
 		t.Fatalf("%+v %v", res, err)
+	}
+}
+
+func TestDesktopHTTPDecodesAllFields(t *testing.T) {
+	r := &rec{}
+	s := &Server{Token: strings.Repeat("t", 32), Run: r.run}
+	h := s.Handler()
+	do := func(action, body string) int {
+		req := httptest.NewRequest("POST", "/v1/desktop/"+action, strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+s.Token)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		return w.Code
+	}
+	if c := do("click", `{"x":11,"y":22}`); c != 200 || r.last() != "xdotool mousemove --sync 11 22 click 1" {
+		t.Fatalf("click: %d %q", c, r.last())
+	}
+	if c := do("drag", `{"x":1,"y":2,"to_x":3,"to_y":4}`); c != 200 || !strings.Contains(r.last(), "mousemove --sync 3 4") {
+		t.Fatalf("drag: %d %q", c, r.last())
+	}
+	if c := do("scroll", `{"dy":-2}`); c != 200 || !strings.Contains(r.last(), "--repeat 2") {
+		t.Fatalf("scroll: %d %q", c, r.last())
+	}
+	if c := do("click", `{"x":11}`); c != 400 {
+		t.Fatalf("fehlendes y: %d", c)
+	}
+	req := httptest.NewRequest("POST", "/v1/desktop/click", strings.NewReader(`{"x":1,"y":1}`))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != 401 {
+		t.Fatalf("ohne token: %d", w.Code)
 	}
 }
