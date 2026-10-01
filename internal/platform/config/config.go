@@ -25,6 +25,7 @@ type Config struct {
 	MasterKey     string `yaml:"-"`
 	MasterKeyFile string `yaml:"master_key_file"`
 
+	TLS      TLS             `yaml:"tls"`
 	Auth     Auth            `yaml:"auth"`
 	Channels Channels        `yaml:"channels"`
 	Router   Router          `yaml:"router"`
@@ -32,6 +33,13 @@ type Config struct {
 	Sandbox  Sandbox         `yaml:"sandbox"`
 	Runtime  Runtime         `yaml:"runtime"`
 	Features map[string]bool `yaml:"features"`
+}
+
+// TLS lässt den Control Plane selbst TLS terminieren. Nötig für mTLS der Nodes
+// (fleet.require_mtls); hinter einem Reverse-Proxy bleibt es leer.
+type TLS struct {
+	CertFile string `yaml:"cert_file"`
+	KeyFile  string `yaml:"key_file"`
 }
 
 type Auth struct {
@@ -98,7 +106,8 @@ type DeploymentSeed struct {
 
 type Fleet struct {
 	Enabled       bool          `yaml:"enabled"`
-	RunPodAPIKey  string        `yaml:"-"` // FYLGJA_RUNPOD_API_KEY (Erststart)
+	RequireMTLS   bool          `yaml:"require_mtls"` // Nodes brauchen ein kurzlebiges Client-Zertifikat
+	RunPodAPIKey  string        `yaml:"-"`            // FYLGJA_RUNPOD_API_KEY (Erststart)
 	RunPodAPIBase string        `yaml:"runpod_api_base"`
 	EvalInterval  time.Duration `yaml:"eval_interval"`
 	PodTemplate   PodTemplate   `yaml:"pod_template"`
@@ -203,6 +212,9 @@ func (c Config) Validate() error {
 	}
 	if !validRoles[c.Role] {
 		errs = append(errs, fmt.Errorf("role %q ungültig", c.Role))
+	}
+	if c.Fleet.RequireMTLS && (c.TLS.CertFile == "" || c.TLS.KeyFile == "") {
+		errs = append(errs, errors.New("fleet.require_mtls braucht tls.cert_file und tls.key_file (der Control Plane muss TLS selbst terminieren)"))
 	}
 	if c.MasterKey == "" {
 		errs = append(errs, errors.New("FYLGJA_MASTER_KEY bzw. master_key_file fehlt"))

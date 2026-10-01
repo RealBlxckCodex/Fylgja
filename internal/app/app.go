@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,6 +28,7 @@ import (
 	"github.com/realblxckcodex/fylgja/internal/coord"
 	"github.com/realblxckcodex/fylgja/internal/events"
 	"github.com/realblxckcodex/fylgja/internal/fleet"
+	"github.com/realblxckcodex/fylgja/internal/fleet/pki"
 	"github.com/realblxckcodex/fylgja/internal/fleet/tunnel"
 	"github.com/realblxckcodex/fylgja/internal/learn"
 	"github.com/realblxckcodex/fylgja/internal/link"
@@ -57,6 +59,7 @@ type App struct {
 	Router   *router.Router
 	Fleet    *fleet.Manager
 	Tunnel   *tunnel.Server
+	NodeCA   *pki.CA
 	Tools    *tools.Registry
 	Memory   *memory.Service
 	Engine   *runtime.Engine
@@ -116,11 +119,17 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger, ui http.Handl
 	}
 	a.Fleet = fleet.NewManager(prov, &routerHook{a: a}, a.Router, nil, log)
 	a.Fleet.RouterURL = strings.Replace(strings.Replace(cfg.BaseURL, "https://", "wss://", 1), "http://", "ws://", 1) + "/api/v1/node/tunnel"
+	a.Fleet.MTLS = cfg.Fleet.RequireMTLS
 	a.Fleet.OnAlert = a.onFleetAlert
 	a.Fleet.OnEvent = func(kind string, detail map[string]any) {
 		_ = a.Audit.Log(context.Background(), audit.Entry{Actor: "system:fleet", Action: kind, Detail: detail})
 	}
-	a.Tunnel = &tunnel.Server{H: &tunnelHandler{a: a}, Log: log}
+	nodeCA, err := pki.NewCA(master)
+	if err != nil {
+		return nil, err
+	}
+	a.NodeCA = nodeCA
+	a.Tunnel = &tunnel.Server{H: &tunnelHandler{a: a}, Log: log, CA: nodeCA, RequireMTLS: cfg.Fleet.RequireMTLS}
 	if err := a.loadFleetPolicies(ctx); err != nil {
 		log.Warn("flotten-policies", "err", err)
 	}
@@ -220,7 +229,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger, ui http.Handl
 		log.Warn("passkeys deaktiviert", "err", err)
 	}
 	a.API = &api.Server{Pool: pool, Auth: a.Auth, Passkeys: a.Passkeys, Runtime: a.Engine, Memory: a.Memory, Hub: a.Hub, Bus: a.Bus,
-		Router: a.Router, Fleet: a.Fleet, Tunnel: a.Tunnel, Links: a.Links, Coord: a.Coord, Pulse: a.Pulse, Tools: a.Tools, Sandbox: a.Sandbox, Audit: a.Audit,
+		Router: a.Router, Fleet: a.Fleet, Tunnel: a.Tunnel, NodeCA: a.NodeCA, Links: a.Links, Coord: a.Coord, Pulse: a.Pulse, Tools: a.Tools, Sandbox: a.Sandbox, Audit: a.Audit,
 		Keyring: a.Keyring, Redactor: a.Redactor, Log: log, UI: ui, BaseURL: cfg.BaseURL, Secure: strings.HasPrefix(cfg.BaseURL, "https://"),
 		RouterToken: cfg.Router.ExternalToken, HookKey: derive(master, "hooks"), SkillKey: derive(master, "skills"), Version: version}
 	return a, nil
@@ -285,7 +294,12 @@ func (a *App) Run(ctx context.Context) error {
 			_ = srv.Shutdown(sctx)
 		}()
 		a.Log.Info("fylgja lauscht", "addr", a.Cfg.Listen, "role", role)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		var serve func() error = srv.ListenAndServe
+		if a.Cfg.TLS.CertFile != "" {
+			srv.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12, ClientCAs: a.NodeCA.Pool(), ClientAuth: tls.VerifyClientCertIfGiven}
+			serve = func() error { return srv.ListenAndServeTLS(a.Cfg.TLS.CertFile, a.Cfg.TLS.KeyFile) }
+		}
+		if err := serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			srvErr = err
 		}
 	} else {

@@ -110,6 +110,7 @@ type Manager struct {
 	OnEvent  func(kind string, detail map[string]any) // Audit/Scale-Event-Historie
 	// Persist speichert einen Node nach jeder Zustandsänderung (DB).
 	Persist   func(n Node, tokenHash []byte)
+	MTLS      bool   // Nodes sollen sich per Client-Zertifikat ausweisen
 	RouterURL string // für die Node-Env (Tunnel-Ziel)
 
 	HeartbeatTimeout time.Duration // Default 20 s
@@ -231,6 +232,9 @@ func (m *Manager) Provision(ctx context.Context, pool string) (*Node, error) {
 	spec := p.Spec
 	spec.Name = pool + "-" + id[len(id)-6:]
 	env := map[string]string{"FYLGJA_NODE_ID": id, "FYLGJA_NODE_TOKEN": token, "FYLGJA_ROUTER_URL": m.RouterURL}
+	if m.MTLS {
+		env["FYLGJA_MTLS"] = "1"
+	}
 	for k, v := range spec.Env {
 		env[k] = v
 	}

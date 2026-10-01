@@ -27,6 +27,7 @@ import (
 	"github.com/realblxckcodex/fylgja/internal/coord"
 	"github.com/realblxckcodex/fylgja/internal/events"
 	"github.com/realblxckcodex/fylgja/internal/fleet"
+	"github.com/realblxckcodex/fylgja/internal/fleet/pki"
 	"github.com/realblxckcodex/fylgja/internal/fleet/tunnel"
 	"github.com/realblxckcodex/fylgja/internal/link"
 	"github.com/realblxckcodex/fylgja/internal/memory"
@@ -50,6 +51,7 @@ type Server struct {
 	Router      *router.Router
 	Fleet       *fleet.Manager
 	Tunnel      *tunnel.Server
+	NodeCA      *pki.CA
 	Links       *link.Registry
 	Coord       *coord.Coordinator
 	Pulse       *pulse.Engine
@@ -304,6 +306,7 @@ func (s *Server) Handler() http.Handler {
 	r.Post("/hooks/{dot}/{source}", s.webhook)
 	if s.Tunnel != nil {
 		r.Handle("/api/v1/node/tunnel", s.Tunnel)
+		r.Post("/api/v1/node/enroll", s.nodeEnroll)
 	}
 	if s.Links != nil {
 		r.Handle("/api/v1/link/tunnel", s.Links.Server())

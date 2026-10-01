@@ -2,7 +2,10 @@ package tunnel
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -11,6 +14,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/realblxckcodex/fylgja/internal/fleet/pki"
 )
 
 type h struct {
@@ -86,4 +91,78 @@ func TestTunnelRejectsBadToken(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 	_ = net.Conn(nil)
+}
+
+func TestMTLS(t *testing.T) {
+	ca, err := pki.NewCA([]byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok") }))
+	defer up.Close()
+	hh := &h{reg: make(chan DialFunc, 1), down: make(chan struct{})}
+	srv := &Server{H: hh, CA: ca, RequireMTLS: true}
+	mux := http.NewServeMux()
+	mux.Handle("/tunnel", srv)
+	mux.HandleFunc("/enroll", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer secret" {
+			http.Error(w, "no", 401)
+			return
+		}
+		csr, _ := io.ReadAll(r.Body)
+		cert, na, err := ca.SignCSR(csr, r.Header.Get("X-Fylgja-Node"), time.Hour, time.Now())
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		json.NewEncoder(w).Encode(EnrollResponse{Cert: string(cert), CA: string(ca.CertPEM()), ExpiresAt: na})
+	})
+	cp := httptest.NewUnstartedServer(mux)
+	cp.TLS = &tls.Config{ClientAuth: tls.VerifyClientCertIfGiven, ClientCAs: ca.Pool()}
+	cp.StartTLS()
+	defer cp.Close()
+	roots := x509.NewCertPool()
+	roots.AddCert(cp.Certificate())
+	base := &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS13}
+	wsURL := "wss" + strings.TrimPrefix(cp.URL, "https") + "/tunnel"
+
+	// Ohne Zertifikat: abgelehnt.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	noCert := &Agent{URL: wsURL, NodeID: "n1", Token: "secret", HTTP: &http.Client{Transport: &http.Transport{TLSClientConfig: base}}}
+	if err := noCert.once(ctx); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("ohne zertifikat sollte 401 kommen, got %v", err)
+	}
+
+	// Zertifikat für anderen Node: abgelehnt.
+	other := &Enroller{URL: "https" + strings.TrimPrefix(cp.URL, "https") + "/enroll", NodeID: "n2", Token: "secret", Base: base}
+	if err := other.Enroll(ctx); err != nil {
+		t.Fatal(err)
+	}
+	wrong := &Agent{URL: wsURL, NodeID: "n1", Token: "secret", HTTP: other.HTTPClient()}
+	if err := wrong.once(ctx); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("fremdes zertifikat sollte 401 kommen, got %v", err)
+	}
+
+	// Falsches Token beim Enrollment.
+	bad := &Enroller{URL: other.URL, NodeID: "n1", Token: "nope", Base: base}
+	if err := bad.Enroll(ctx); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("enroll mit falschem token: %v", err)
+	}
+
+	// Richtiges Zertifikat: Tunnel steht.
+	en := &Enroller{URL: other.URL, NodeID: "n1", Token: "secret", Base: base}
+	if err := en.Enroll(ctx); err != nil {
+		t.Fatal(err)
+	}
+	rctx, rcancel := context.WithCancel(context.Background())
+	defer rcancel()
+	agent := &Agent{URL: wsURL, NodeID: "n1", Token: "secret", Upstream: strings.TrimPrefix(up.URL, "http://"), HTTP: en.HTTPClient(),
+		Register: func() any { return map[string]string{"gpu_model": "L40S"} }}
+	go agent.Run(rctx)
+	select {
+	case <-hh.reg:
+	case <-time.After(5 * time.Second):
+		t.Fatal("tunnel mit gültigem zertifikat kam nicht zustande")
+	}
 }

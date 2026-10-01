@@ -1,6 +1,7 @@
 package api
 
 import (
+	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -8,7 +9,10 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/realblxckcodex/fylgja/internal/audit"
 	"github.com/realblxckcodex/fylgja/internal/fleet"
+	"github.com/realblxckcodex/fylgja/internal/fleet/pki"
+	"github.com/realblxckcodex/fylgja/internal/fleet/tunnel"
 	"github.com/realblxckcodex/fylgja/internal/router"
 )
 
@@ -301,7 +305,45 @@ func (s *Server) addStaticNode(w http.ResponseWriter, r *http.Request) {
 	s.audit(r, "fleet.add_node", n.ID, map[string]any{"name": in.Name})
 	url := strings.Replace(strings.Replace(s.BaseURL, "https://", "wss://", 1), "http://", "ws://", 1) + "/api/v1/node/tunnel"
 	writeJSON(w, 201, map[string]any{"id": n.ID, "token": tok, "router_url": url,
-		"env": map[string]string{"FYLGJA_ROUTER_URL": url, "FYLGJA_NODE_ID": n.ID, "FYLGJA_NODE_TOKEN": tok, "FYLGJA_UPSTREAM": "127.0.0.1:11434",
+		"env": map[string]string{"FYLGJA_ROUTER_URL": url, "FYLGJA_NODE_ID": n.ID, "FYLGJA_NODE_TOKEN": tok, "FYLGJA_UPSTREAM": "127.0.0.1:11434", "FYLGJA_MTLS": s.mtlsFlag(),
 			"FYLGJA_DEPLOYMENTS": `[{"model":"triage-fast","served_model":"qwen3:8b","engine":"ollama","max_concurrency":4}]`},
 		"hint": "Token wird nur einmal angezeigt."})
+}
+
+// nodeEnroll stellt einem Node (Authentifizierung per Node-Token) ein kurzlebiges Client-
+// Zertifikat aus. Der Node erzeugt den Schlüssel selbst und schickt nur die CSR.
+func (s *Server) nodeEnroll(w http.ResponseWriter, r *http.Request) {
+	if s.Fleet == nil || s.NodeCA == nil {
+		problem(w, 501, "flotte nicht aktiv")
+		return
+	}
+	nodeID := r.Header.Get("X-Fylgja-Node")
+	tok := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if nodeID == "" || !s.limiter.allow(clientIP(r)) {
+		problem(w, 401, "nicht autorisiert")
+		return
+	}
+	if _, ok := s.Fleet.Authenticate(nodeID, tok); !ok {
+		problem(w, 401, "nicht autorisiert")
+		return
+	}
+	csr, err := io.ReadAll(io.LimitReader(r.Body, 16<<10))
+	if err != nil {
+		problem(w, 400, "csr unlesbar")
+		return
+	}
+	cert, na, err := s.NodeCA.SignCSR(csr, nodeID, pki.DefaultTTL, time.Now())
+	if err != nil {
+		problem(w, 400, err.Error())
+		return
+	}
+	_ = s.Audit.Log(r.Context(), audit.Entry{Actor: "node:" + nodeID, Action: "fleet.node_cert_issued", Target: nodeID, Detail: map[string]any{"expires_at": na}})
+	writeJSON(w, 200, tunnel.EnrollResponse{Cert: string(cert), CA: string(s.NodeCA.CertPEM()), ExpiresAt: na})
+}
+
+func (s *Server) mtlsFlag() string {
+	if s.Tunnel != nil && s.Tunnel.RequireMTLS {
+		return "1"
+	}
+	return "0"
 }

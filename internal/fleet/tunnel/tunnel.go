@@ -22,6 +22,8 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/hashicorp/yamux"
+
+	"github.com/realblxckcodex/fylgja/internal/fleet/pki"
 )
 
 // Control ist eine Nachricht auf dem Kontroll-Stream (Node → Control Plane).
@@ -47,6 +49,12 @@ type Server struct {
 	H   Handler
 	Log *slog.Logger
 
+	// CA und RequireMTLS: Ist RequireMTLS gesetzt, muss der Node ein gültiges, von CA
+	// ausgestelltes Client-Zertifikat vorzeigen, dessen CN der Node-ID entspricht.
+	// Das setzt voraus, dass der Control Plane TLS selbst terminiert (r.TLS != nil).
+	CA          *pki.CA
+	RequireMTLS bool
+
 	mu       sync.Mutex
 	sessions map[string]*yamux.Session
 }
@@ -68,6 +76,17 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if nodeID == "" || !s.H.Authenticate(nodeID, token) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
+	}
+	if s.RequireMTLS {
+		if s.CA == nil || r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+			http.Error(w, "client-zertifikat erforderlich", http.StatusUnauthorized)
+			return
+		}
+		if err := s.CA.VerifyNode(r.TLS.PeerCertificates[0], nodeID, time.Now()); err != nil {
+			s.log().Warn("node-zertifikat abgelehnt", "node", nodeID, "err", err)
+			http.Error(w, "client-zertifikat ungültig", http.StatusUnauthorized)
+			return
+		}
 	}
 	c, err := websocket.Accept(w, r, nil)
 	if err != nil {

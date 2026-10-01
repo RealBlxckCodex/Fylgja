@@ -14,9 +14,12 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -60,6 +63,27 @@ func main() {
 			defer cancel()
 			return col.Collect(c)
 		},
+	}
+	if os.Getenv("FYLGJA_MTLS") == "1" {
+		// Kurzlebiges Client-Zertifikat: Schlüssel entsteht lokal, Erneuerung bei 2/3 der Laufzeit.
+		base := &tls.Config{MinVersion: tls.VersionTLS12}
+		if f := os.Getenv("FYLGJA_SERVER_CA"); f != "" {
+			pemBytes, err := os.ReadFile(f)
+			if err != nil {
+				log.Error("FYLGJA_SERVER_CA", "err", err)
+				os.Exit(1)
+			}
+			base.RootCAs = x509.NewCertPool()
+			base.RootCAs.AppendCertsFromPEM(pemBytes)
+		}
+		enrollURL := strings.Replace(strings.Replace(agent.URL, "wss://", "https://", 1), "/node/tunnel", "/node/enroll", 1)
+		en := &tunnel.Enroller{URL: enrollURL, NodeID: agent.NodeID, Token: agent.Token, Base: base, Log: log}
+		if err := en.Enroll(ctx); err != nil {
+			log.Error("enrollment", "err", err)
+			os.Exit(1)
+		}
+		go en.Run(ctx)
+		agent.HTTP = en.HTTPClient()
 	}
 	_ = os.Unsetenv("FYLGJA_NODE_TOKEN")
 	if err := agent.Run(ctx); err != nil && ctx.Err() == nil {
