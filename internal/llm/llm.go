@@ -100,6 +100,7 @@ type Usage struct {
 // Response ist die vollständige Antwort.
 type Response struct {
 	Message      Message `json:"message"`
+	Reasoning    string  `json:"reasoning,omitempty"` // Denkprozess (reasoning_content), falls das Modell ihn liefert
 	Usage        Usage   `json:"usage"`
 	FinishReason string  `json:"finish_reason"`
 	Model        string  `json:"model"`

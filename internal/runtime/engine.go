@@ -743,6 +743,7 @@ func (e *Engine) callModel(ctx context.Context, run *Run, dot *Dot, st *state, b
 	if _, err := e.Store.Append(ctx, run.ID, EvModelRequest, map[string]any{"model": req.Model, "tier": st.tier, "messages": len(msgs), "tools": len(req.Tools), "prefix_hash": base.PrefixHash, "privacy": privacy}); err != nil {
 		return nil, err
 	}
+	e.publish(ctx, "run."+run.ID.String(), map[string]any{"type": "step", "step": "thinking", "model": req.Model, "tier": st.tier, "tools": len(req.Tools), "n": st.steps + 1})
 	var onDelta llm.DeltaFunc
 	if run.Kind == KindChat && e.Out != nil {
 		var buf strings.Builder
@@ -779,6 +780,9 @@ func (e *Engine) callModel(ctx context.Context, run *Run, dot *Dot, st *state, b
 		Cost: resp.CostMicroEUR, Degraded: resp.Degraded, Model: req.Model, Tier: st.tier}); err != nil {
 		return nil, err
 	}
+	if resp.Reasoning != "" {
+		e.publish(ctx, "run."+run.ID.String(), map[string]any{"type": "step", "step": "reasoning", "text": e.redact(resp.Reasoning)})
+	}
 	_ = e.Store.RecordUsage(ctx, UsageEvent{DotID: dot.ID, RunID: run.ID, Model: req.Model, Tier: st.tier, Deployment: resp.Deployment,
 		TokensIn: resp.Usage.In, TokensOut: resp.Usage.Out, TokensCached: resp.Usage.Cached, CostMicroEUR: resp.CostMicroEUR, LatencyMS: resp.LatencyMS})
 	if resp.Degraded && st.tier == "planner" && e.Out != nil {
@@ -813,7 +817,7 @@ func (e *Engine) result(ctx context.Context, run *Run, st *state, cs *callState,
 			return err
 		}
 	}
-	e.publish(ctx, "run."+run.ID.String(), map[string]any{"type": "tool_result", "tool": p.Tool, "is_error": p.IsError, "untrusted": p.Untrusted})
+	e.publish(ctx, "run."+run.ID.String(), map[string]any{"type": "step", "step": "tool_result", "call_id": p.CallID, "tool": p.Tool, "is_error": p.IsError, "untrusted": p.Untrusted, "preview": clipStr(p.Content, 600)})
 	return nil
 }
 
@@ -842,6 +846,13 @@ func (e *Engine) processCall(ctx context.Context, run *Run, dot *Dot, st *state,
 			return err
 		}
 		cs.journaled = true
+		var pa any
+		_ = json.Unmarshal([]byte(e.redact(string(tc.Arguments))), &pa)
+		cls := ""
+		if known {
+			cls = string(tool.Class)
+		}
+		e.publish(ctx, "run."+run.ID.String(), map[string]any{"type": "step", "step": "tool_call", "call_id": tc.ID, "tool": tc.Name, "class": cls, "args": pa})
 	}
 	if !known {
 		return e.result(ctx, run, st, cs, toolResultPayload{Content: "unbekanntes tool " + tc.Name + " – nutze tools.search", IsError: true})
@@ -857,6 +868,7 @@ func (e *Engine) processCall(ctx context.Context, run *Run, dot *Dot, st *state,
 		if _, err := e.Store.Append(ctx, run.ID, EvPolicy, map[string]any{"call_id": tc.ID, "decision": d}); err != nil {
 			return err
 		}
+		e.publish(ctx, "run."+run.ID.String(), map[string]any{"type": "step", "step": "policy", "call_id": tc.ID, "verdict": d.Verdict, "reasons": d.Reasons, "risk": d.Risk})
 		if tool.Class.SideEffect() && e.Audit != nil {
 			_ = e.Audit.Log(ctx, audit.Entry{WorkspaceID: dot.WorkspaceID, Actor: "dot:" + dot.ID.String(), Action: "tool.decision", Target: tool.Name,
 				Detail: map[string]any{"run": run.ID.String(), "verdict": d.Verdict, "class": tool.Class, "tainted": st.tainted, "reasons": d.Reasons}})
@@ -1188,3 +1200,11 @@ func (e *Engine) ExpireApprovals(ctx context.Context) int {
 
 // contains ist ein kleiner Helfer.
 func contains(list []string, s string) bool { return slices.Contains(list, s) }
+
+func clipStr(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n]) + "…"
+}

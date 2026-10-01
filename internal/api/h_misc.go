@@ -43,6 +43,7 @@ func (s *Server) routes(r chi.Router) {
 	r.With(need("work")).Post("/dots/{id}/chat", s.chat)
 	r.Get("/dots/{id}/messages", s.messages)
 	r.Get("/dots/{id}/runs", s.listRuns)
+	r.With(need("work")).Post("/messages/{mid}/feedback", s.messageFeedback)
 	r.Get("/dots/{id}/memory", s.listMemory)
 	r.With(need("work")).Post("/dots/{id}/memory", s.addMemory)
 	r.Get("/dots/{id}/memory/export", s.exportMemory)

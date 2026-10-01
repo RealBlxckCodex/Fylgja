@@ -11,6 +11,7 @@ import Status from '@/components/Status.vue'
 import Badge from '@/components/Badge.vue'
 import Btn from '@/components/Btn.vue'
 import Chart from '@/components/Chart.vue'
+import FlowTopology from '@/components/FlowTopology.vue'
 import Gauge from '@/components/Gauge.vue'
 import Empty from '@/components/Empty.vue'
 import Modal from '@/components/Modal.vue'
@@ -40,25 +41,6 @@ onBeforeUnmount(() => { close?.(); clearInterval(timer) })
 const s = computed(() => fo.value?.summary ?? {})
 const deps = computed(() => fo.value?.router?.deployments ?? [])
 const agents = computed(() => (fo.value?.agents ?? []).filter((a: any) => !filter.value || JSON.stringify(a).toLowerCase().includes(filter.value.toLowerCase())))
-// A) Topologie: Agenten → Sandbox-Hosts → Modell-Deployments; Kanten = Aufrufe (5 min)
-const topo = computed(() => {
-  if (!fo.value) return {}
-  const nodes: any[] = []; const links: any[] = []
-  const hosts = new Set<string>()
-  const ag = fo.value.agents.slice(0, 30)
-  ag.forEach((a: any, i: number) => {
-    nodes.push({ id: 'a:' + a.run_id, name: `${a.dot_name} · ${a.kind}`, x: 0, y: i * 60, symbolSize: 18, itemStyle: { color: a.status === 'running' ? '#5b8def' : '#8b8b95' } })
-    const h = a.sandbox_host || 'ohne Sandbox'; hosts.add(h)
-    links.push({ source: 'a:' + a.run_id, target: 'h:' + h, lineStyle: { width: 1, color: '#555' } })
-    for (const [d, n] of Object.entries(a.deployments)) links.push({ source: 'h:' + h, target: 'd:' + d, value: n, lineStyle: { width: Math.min(8, 1 + Math.log2(1 + (n as number))), color: '#d4313f' } })
-  })
-  ;[...hosts].forEach((h, i) => nodes.push({ id: 'h:' + h, name: h, x: 400, y: i * 90, symbol: 'roundRect', symbolSize: [120, 34], itemStyle: { color: '#18181b', borderColor: '#555' }, label: { show: true, position: 'inside', color: '#ddd' } }))
-  deps.value.forEach((d: any, i: number) => nodes.push({ id: 'd:' + d.name, name: `${d.name}\n${d.inflight}/${d.max_concurrency} · ${d.breaker}`, x: 800, y: i * 70, symbol: 'roundRect', symbolSize: [170, 40],
-    itemStyle: { color: '#18181b', borderColor: d.breaker !== 'closed' ? '#f05a28' : d.state === 'ready' ? '#3fb68b' : '#e6b422' }, label: { show: true, position: 'inside', color: '#ddd', fontSize: 10 } }))
-  const known = new Set(nodes.map((n) => n.id))
-  return { tooltip: { trigger: 'item' }, series: [{ type: 'graph', layout: 'none', roam: true, label: { show: true, position: 'right', color: '#bbb', fontSize: 11 }, data: nodes,
-    links: links.filter((l) => known.has(l.source) && known.has(l.target)), lineStyle: { curveness: 0.15, opacity: 0.8 }, edgeSymbol: ['none', 'arrow'], edgeSymbolSize: 6 }] }
-})
 const queueChart = computed(() => {
   const classes = ['interactive', 'review', 'task', 'background']
   return { legend: { data: classes, textStyle: { color: '#aaa' } }, xAxis: { type: 'time' }, yAxis: { type: 'value', name: 'Wartend', minInterval: 1 },
@@ -66,7 +48,6 @@ const queueChart = computed(() => {
 })
 const costChart = computed(() => ({ xAxis: { type: 'category', data: ['Flotte gesamt', 'davon zugeordnet', 'Leerlauf (Overhead)', 'Kosten gesamt heute'] }, yAxis: { type: 'value', name: '€' },
   series: [{ type: 'bar', data: [s.value.fleet_spend_today_micro_eur, Math.max(0, s.value.fleet_spend_today_micro_eur - s.value.fleet_overhead_micro_eur), s.value.fleet_overhead_micro_eur, s.value.cost_today_micro_eur].map((v) => ((v || 0) / 1e6).toFixed(2)) }] }))
-const topoH = computed(() => Math.min(620, Math.max(260, deps.value.length * 78, (fo.value?.agents?.length ?? 0) * 62)) + 'px')
 const whatIf = computed(() => {
   const ready = s.value.nodes_ready || 0
   const p95 = s.value.queue_wait_p95_ms || 0
@@ -106,8 +87,8 @@ async function addNode() { try { added.value = await post('/fleet/nodes', { name
     <Tabs v-model="tab" :tabs="[{ id: 'topology', label: 'Topologie' }, { id: 'nodes', label: 'Nodes', badge: fo.nodes.length || undefined }, { id: 'router', label: 'Queue & Routing' },
       { id: 'agents', label: 'Agenten', badge: fo.agents.length || undefined }, { id: 'capacity', label: 'Kapazität & Kosten' }, { id: 'hosts', label: 'Sandbox-Hosts' }]" />
 
-    <Card v-if="tab === 'topology'" title="Wo läuft welcher Agent?" subtitle="Agenten → Sandbox-Hosts → Modell-Deployments · Kantenstärke = Modellaufrufe (5 min) · rot umrandet = Circuit Breaker offen">
-      <Chart v-if="fo.agents.length || deps.length" :option="topo" :height="topoH" /><Empty v-else>Keine aktiven Agenten und keine Deployments.</Empty>
+    <Card v-if="tab === 'topology'" title="Wo läuft welcher Agent?" subtitle="Agenten → Sandbox-Hosts → Modell-Deployments · Linienstärke = Modellaufrufe (5 min) · orange = Circuit Breaker offen · Hover hebt Pfad hervor">
+      <FlowTopology v-if="fo.agents.length || deps.length" :agents="fo.agents" :deployments="deps" /><Empty v-else>Keine aktiven Agenten und keine Deployments.</Empty>
     </Card>
 
     <div v-else-if="tab === 'nodes'" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

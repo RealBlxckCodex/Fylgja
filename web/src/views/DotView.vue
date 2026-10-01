@@ -14,6 +14,7 @@ import Journal from '@/components/Journal.vue'
 import MemoryBrowser from '@/components/MemoryBrowser.vue'
 import Empty from '@/components/Empty.vue'
 import Emblem from '@/components/Emblem.vue'
+import ChatPanel from '@/components/ChatPanel.vue'
 const props = defineProps<{ id: string }>()
 const toast = useToast()
 const auth = useAuth()
@@ -124,33 +125,7 @@ const autonomyText = ['L0 Vorsicht – jede Aktion wird gefragt', 'L1 Standard �
     </header>
     <Tabs v-model="tab" :tabs="tabs" />
 
-    <div v-if="tab === 'chat'" class="panel flex flex-col h-[calc(100vh-18rem)] min-h-96 overflow-hidden">
-      <div ref="box" class="flex-1 overflow-auto px-5 py-6 space-y-5">
-        <div v-for="(m, i) in messages" :key="m.id || i" class="flex gap-3 rise" :class="m.role === 'user' ? 'flex-row-reverse' : ''">
-          <div v-if="m.role !== 'user'" class="size-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style="background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line)"><Emblem :size="18" /></div>
-          <div class="max-w-[78%]">
-            <div class="rounded-2xl px-4 py-3 text-[14.5px] leading-relaxed whitespace-pre-wrap" :class="m.role === 'user' ? 'bg-accent text-white rounded-br-md' : 'rounded-bl-md'" :style="m.role === 'user' ? '' : 'background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line)'">{{ m.text }}</div>
-            <div class="text-[10.5px] muted mt-1 px-1" :class="m.role === 'user' ? 'text-right' : ''">{{ dt(m.created_at) }}<span v-if="m.trust && m.trust !== 'owner' && m.role === 'user'"> · {{ m.trust }}</span></div>
-          </div>
-        </div>
-        <div v-if="liveRun" class="flex gap-3">
-          <div class="size-8 rounded-xl flex items-center justify-center shrink-0 aura" style="background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--accent-glow)"><Emblem :size="18" /></div>
-          <div class="max-w-[78%] rounded-2xl rounded-bl-md px-4 py-3 text-[14.5px] leading-relaxed whitespace-pre-wrap" style="background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line)">
-            <template v-if="live">{{ live }}<span class="animate-pulse accent">▌</span></template>
-            <span v-else class="inline-flex gap-1 py-1"><i v-for="n in 3" :key="n" class="size-1.5 rounded-full bg-[var(--muted)] animate-bounce" :style="{ animationDelay: n * 0.12 + 's' }" /></span>
-          </div>
-        </div>
-        <Empty v-if="!messages.length && !liveRun">Schreib {{ dot.name }} eine Nachricht. Dieselbe Fylgja erreichst du auch über Discord und Telegram – der Kontext ist geteilt.</Empty>
-      </div>
-      <form class="p-4 pt-0" @submit.prevent="send">
-        <div class="flex gap-2 items-end rounded-2xl p-2 pl-4" style="background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line-strong)">
-          <label for="chat-input" class="sr-only">Nachricht</label>
-          <textarea id="chat-input" v-model="input" class="flex-1 bg-transparent outline-none resize-none py-2 max-h-40" rows="1" :placeholder="`Nachricht an ${dot.name}…`" @keydown.enter.exact.prevent="send" />
-          <Btn v-if="liveRun" size="sm" variant="ghost" @click="stop">■ Stopp</Btn>
-          <Btn type="submit" :loading="sending">Senden ↵</Btn>
-        </div>
-      </form>
-    </div>
+    <div v-if="tab === 'chat'" class="panel overflow-hidden h-[calc(100vh-15.5rem)] min-h-[28rem]"><ChatPanel :dot="{ id, name: dot.name }" /></div>
 
     <div v-else-if="tab === 'activity'" class="grid gap-4 lg:grid-cols-5">
       <Card title="Läufe" class="lg:col-span-2" flush>

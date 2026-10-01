@@ -1,0 +1,1 @@
+import{O as e,b as t,g as n,j as r,p as i,x as a}from"./flow-CeIZGeHo.js";import{t as o}from"./Emblem-D_WweVZ3.js";var s={class:`text-center py-12 px-6 muted text-sm flex flex-col items-center gap-3`},c={class:`max-w-md`},l=a({__name:`Empty`,setup(a){return(a,l)=>(e(),n(`div`,s,[t(o,{size:30,class:`opacity-30`}),i(`div`,c,[r(a.$slots,`default`)])]))}});export{l as t};

@@ -292,7 +292,81 @@ func (s *Server) messages(w http.ResponseWriter, r *http.Request) {
 		problem(w, 500, err.Error())
 		return
 	}
-	writeJSON(w, 200, map[string]any{"conversation_id": conv, "messages": msgs})
+	// Je Assistenten-Nachricht: ausgeführte Schritte (Tool-Namen) und Gesamtdauer des Runs.
+	type stepInfo struct {
+		Tools      []string `json:"tools"`
+		DurationMS int64    `json:"duration_ms"`
+		Tainted    bool     `json:"tainted"`
+		Model      string   `json:"model"`
+	}
+	steps := map[string]stepInfo{}
+	for _, m := range msgs {
+		if m.RunID == nil || m.Role != "assistant" {
+			continue
+		}
+		si := stepInfo{Tools: []string{}}
+		rows, err := s.Pool.Query(r.Context(), `SELECT payload->>'tool' FROM run_events WHERE run_id=$1 AND type='tool_call' ORDER BY seq`, *m.RunID)
+		if err == nil {
+			for rows.Next() {
+				var t string
+				_ = rows.Scan(&t)
+				si.Tools = append(si.Tools, t)
+			}
+			rows.Close()
+		}
+		_ = s.Pool.QueryRow(r.Context(), `SELECT coalesce(extract(epoch FROM (finished_at - coalesce(started_at, created_at)))*1000, 0)::bigint, tainted FROM runs WHERE id=$1`, *m.RunID).Scan(&si.DurationMS, &si.Tainted)
+		_ = s.Pool.QueryRow(r.Context(), `SELECT coalesce(payload->>'model','') FROM run_events WHERE run_id=$1 AND type='model_request' ORDER BY seq DESC LIMIT 1`, *m.RunID).Scan(&si.Model)
+		steps[m.ID.String()] = si
+	}
+	var fb []struct {
+		MessageID string `json:"message_id"`
+		Kind      string `json:"kind"`
+	}
+	if frows, err := s.Pool.Query(r.Context(), `SELECT message_id::text, kind FROM feedback WHERE message_id IN (SELECT id FROM messages WHERE conversation_id=$1) AND kind IN ('thumb_up','thumb_down')`, conv); err == nil {
+		for frows.Next() {
+			var x struct {
+				MessageID string `json:"message_id"`
+				Kind      string `json:"kind"`
+			}
+			_ = frows.Scan(&x.MessageID, &x.Kind)
+			fb = append(fb, x)
+		}
+		frows.Close()
+	}
+	writeJSON(w, 200, map[string]any{"conversation_id": conv, "messages": msgs, "steps": steps, "feedback": fb})
+}
+
+// messageFeedback speichert 👍/👎 auf einer Antwort (Lernschleife, 11.5).
+func (s *Server) messageFeedback(w http.ResponseWriter, r *http.Request) {
+	id, err := pathUUID(r, "mid")
+	if err != nil {
+		problem(w, 404, "nicht gefunden")
+		return
+	}
+	var in struct {
+		Kind    string `json:"kind"`
+		Comment string `json:"comment"`
+	}
+	if err := decode(r, &in); err != nil || (in.Kind != "thumb_up" && in.Kind != "thumb_down" && in.Kind != "none") {
+		problem(w, 400, "kind: thumb_up|thumb_down|none")
+		return
+	}
+	var dot uuid.UUID
+	var run *uuid.UUID
+	if s.Pool.QueryRow(r.Context(), `SELECT c.dot_id, m.run_id FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE m.id=$1`, id).Scan(&dot, &run) != nil || s.dotInWorkspace(r, dot) != nil {
+		problem(w, 404, "nachricht nicht gefunden")
+		return
+	}
+	_, _ = s.Pool.Exec(r.Context(), `DELETE FROM feedback WHERE message_id=$1 AND kind IN ('thumb_up','thumb_down')`, id)
+	if in.Kind != "none" {
+		_, err = s.Pool.Exec(r.Context(), `INSERT INTO feedback (id, dot_id, run_id, message_id, kind, payload) VALUES ($1,$2,$3,$4,$5,$6)`,
+			uuid.Must(uuid.NewV7()), dot, run, id, in.Kind, map[string]any{"via": "web", "comment": in.Comment})
+		if err != nil {
+			problem(w, 500, err.Error())
+			return
+		}
+	}
+	writeJSON(w, 200, map[string]any{"ok": true})
 }
 
 func (s *Server) listRuns(w http.ResponseWriter, r *http.Request) {

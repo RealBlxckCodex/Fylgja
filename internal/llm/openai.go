@@ -30,6 +30,8 @@ func (o *OpenAI) client() *http.Client {
 type oaMsg struct {
 	Role       string       `json:"role"`
 	Content    any          `json:"content"`
+	Reasoning  string       `json:"reasoning_content,omitempty"`
+	Reasoning2 string       `json:"reasoning,omitempty"`
 	ToolCalls  []oaToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string       `json:"tool_call_id,omitempty"`
 	Name       string       `json:"name,omitempty"`
@@ -198,7 +200,7 @@ func (o *OpenAI) Chat(ctx context.Context, req Request, onDelta DeltaFunc) (*Res
 		for _, tc := range c.Message.ToolCalls {
 			msg.ToolCalls = append(msg.ToolCalls, ToolCall{ID: tc.ID, Name: tc.Function.Name, Arguments: json.RawMessage(normArgs(tc.Function.Arguments))})
 		}
-		return &Response{Message: msg, Usage: r.usage(), FinishReason: c.FinishReason, Model: r.Model, LatencyMS: int(time.Since(start).Milliseconds())}, nil
+		return &Response{Message: msg, Reasoning: firstNE(c.Message.Reasoning, c.Message.Reasoning2), Usage: r.usage(), FinishReason: c.FinishReason, Model: r.Model, LatencyMS: int(time.Since(start).Milliseconds())}, nil
 	}
 	return o.readStream(resp.Body, onDelta, start)
 }
@@ -214,7 +216,7 @@ func (o *OpenAI) readStream(body io.Reader, onDelta DeltaFunc, start time.Time) 
 	sc := bufio.NewScanner(body)
 	sc.Buffer(make([]byte, 64*1024), 8*1024*1024)
 	out := &Response{Message: Message{Role: Assistant}}
-	var text strings.Builder
+	var text, reasoning strings.Builder
 	type partial struct {
 		id, name string
 		args     strings.Builder
@@ -241,6 +243,9 @@ func (o *OpenAI) readStream(body io.Reader, onDelta DeltaFunc, start time.Time) 
 			out.Usage = r.usage()
 		}
 		for _, c := range r.Choices {
+			if rs := firstNE(c.Delta.Reasoning, c.Delta.Reasoning2); rs != "" {
+				reasoning.WriteString(rs)
+			}
 			if s := contentString(c.Delta.Content); s != "" {
 				gotToken = true
 				text.WriteString(s)
@@ -275,6 +280,7 @@ func (o *OpenAI) readStream(body io.Reader, onDelta DeltaFunc, start time.Time) 
 		return nil, &APIError{Status: 502, Body: "stream abgebrochen: " + err.Error(), BeforeFirstToken: !gotToken}
 	}
 	out.Message.Content = text.String()
+	out.Reasoning = reasoning.String()
 	for i, p := range calls {
 		id := p.id
 		if id == "" {
@@ -309,4 +315,11 @@ func (o *OpenAI) Embed(ctx context.Context, model string, inputs []string) ([][]
 		}
 	}
 	return out, nil
+}
+
+func firstNE(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
 }
