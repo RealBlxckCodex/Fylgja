@@ -125,9 +125,9 @@ docker compose -f deploy/docker-compose.yml up</pre>
   <table>
     <tr><th data-i="th1">Works and is tested</th><th data-i="th2">Written, not tried against the real thing</th><th data-i="th3">Not built</th></tr>
     <tr>
-      <td>Run engine and journal, memory, policy and approvals, router and queue, web UI, audit log</td>
-      <td>RunPod provisioning, Discord and Telegram bots, Docker/gVisor sandbox, WebAuthn in a browser</td>
-      <td>Firecracker, live voice, Microsoft 365 and native Google connectors, skill marketplace, Telegram Mini App, per-node mTLS</td>
+      <td>Run engine and journal, memory, policy and approvals, router and queue, web UI, audit log, node mTLS, signed skill registry</td>
+      <td>RunPod provisioning, Discord and Telegram bots, Docker/gVisor sandbox, WebAuthn in a browser, Gmail and Calendar connector (tested against a local fake)</td>
+      <td>Firecracker, live voice, Microsoft 365 connector, Telegram Mini App</td>
     </tr>
   </table>
   <div class="note"><p data-i="t3">If you try it and something breaks, an issue on GitHub with the log is the most useful thing you can send.</p></div>
