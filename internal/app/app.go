@@ -25,6 +25,7 @@ import (
 	"github.com/realblxckcodex/fylgja/internal/channels"
 	"github.com/realblxckcodex/fylgja/internal/channels/discord"
 	"github.com/realblxckcodex/fylgja/internal/channels/telegram"
+	"github.com/realblxckcodex/fylgja/internal/connectors/google"
 	"github.com/realblxckcodex/fylgja/internal/coord"
 	"github.com/realblxckcodex/fylgja/internal/events"
 	"github.com/realblxckcodex/fylgja/internal/fleet"
@@ -60,6 +61,7 @@ type App struct {
 	Fleet    *fleet.Manager
 	Tunnel   *tunnel.Server
 	NodeCA   *pki.CA
+	Google   *google.Client
 	Tools    *tools.Registry
 	Memory   *memory.Service
 	Engine   *runtime.Engine
@@ -102,7 +104,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger, ui http.Handl
 	a.master = master
 	a.Keyring = vault.NewKeyring(master)
 	a.Redactor = vault.NewRedactor()
-	for _, s := range []string{cfg.Channels.Telegram.Token, cfg.Channels.Discord.Token, cfg.Fleet.RunPodAPIKey, cfg.Router.ExternalToken, cfg.MasterKey} {
+	for _, s := range []string{cfg.Google.ClientSecret, cfg.Channels.Telegram.Token, cfg.Channels.Discord.Token, cfg.Fleet.RunPodAPIKey, cfg.Router.ExternalToken, cfg.MasterKey} {
 		a.Redactor.Register(s)
 	}
 	a.Audit = &audit.PG{Pool: pool}
@@ -228,6 +230,13 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger, ui http.Handl
 	} else {
 		log.Warn("passkeys deaktiviert", "err", err)
 	}
+	if cfg.Google.ClientID != "" && cfg.Google.ClientSecret != "" {
+		a.Google = &google.Client{
+			Cfg:  google.Config{ClientID: cfg.Google.ClientID, ClientSecret: cfg.Google.ClientSecret, RedirectURL: strings.TrimRight(cfg.BaseURL, "/") + "/api/v1/connectors/google/callback"},
+			HTTP: guard.Client(30 * time.Second), Pool: pool, Keyring: a.Keyring, StateKey: derive(master, "google-state"),
+		}
+		google.Register(a.Tools, a.Google)
+	}
 	var skillReg *skills.Registry
 	if len(cfg.Skills.Registries) > 0 {
 		trust, err := skills.ParseTrust(cfg.Skills.TrustedPublishers)
@@ -236,7 +245,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger, ui http.Handl
 		}
 		skillReg = &skills.Registry{HTTP: guard.Client(20 * time.Second), URLs: cfg.Skills.Registries, Trust: trust}
 	}
-	a.API = &api.Server{SkillRegistry: skillReg, Pool: pool, Auth: a.Auth, Passkeys: a.Passkeys, Runtime: a.Engine, Memory: a.Memory, Hub: a.Hub, Bus: a.Bus,
+	a.API = &api.Server{SkillRegistry: skillReg, Google: a.Google, Pool: pool, Auth: a.Auth, Passkeys: a.Passkeys, Runtime: a.Engine, Memory: a.Memory, Hub: a.Hub, Bus: a.Bus,
 		Router: a.Router, Fleet: a.Fleet, Tunnel: a.Tunnel, NodeCA: a.NodeCA, Links: a.Links, Coord: a.Coord, Pulse: a.Pulse, Tools: a.Tools, Sandbox: a.Sandbox, Audit: a.Audit,
 		Keyring: a.Keyring, Redactor: a.Redactor, Log: log, UI: ui, BaseURL: cfg.BaseURL, Secure: strings.HasPrefix(cfg.BaseURL, "https://"),
 		RouterToken: cfg.Router.ExternalToken, HookKey: derive(master, "hooks"), SkillKey: derive(master, "skills"), Version: version}

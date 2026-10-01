@@ -66,3 +66,6 @@ features:
 #   registries: ["https://example.org/fylgja-skills/index.json"]
 #   trusted_publishers:
 #     acme: "<base64-Public-Key aus `fyctl skill keygen`>"
+
+# google:                       # Gmail/Kalender (ADR 0010); Secret per FYLGJA_GOOGLE_CLIENT_SECRET
+#   client_id: "…apps.googleusercontent.com"   # Redirect-URI: <base_url>/api/v1/connectors/google/callback

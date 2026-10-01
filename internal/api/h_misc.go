@@ -93,6 +93,9 @@ func (s *Server) routes(r chi.Router) {
 	r.Get("/usage", s.costs)
 	r.With(need("own")).Put("/budgets", s.putBudget)
 
+	r.Get("/dots/{id}/google", s.googleStatus)
+	r.With(need("manage"), stepUp).Post("/dots/{id}/google/connect", s.googleConnect)
+	r.With(need("manage")).Delete("/dots/{id}/google", s.googleDisconnect)
 	r.Get("/skills", s.listSkills)
 	r.Get("/skills/registry", s.registryList)
 	r.With(need("manage")).Post("/skills/registry/install", s.registryInstall)

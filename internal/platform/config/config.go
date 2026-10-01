@@ -34,6 +34,7 @@ type Config struct {
 	Sandbox  Sandbox         `yaml:"sandbox"`
 	Runtime  Runtime         `yaml:"runtime"`
 	Skills   Skills          `yaml:"skills"`
+	Google   Google          `yaml:"google"`
 	Features map[string]bool `yaml:"features"`
 }
 
@@ -43,6 +44,12 @@ type Config struct {
 type Skills struct {
 	Registries        []string          `yaml:"registries"`
 	TrustedPublishers map[string]string `yaml:"trusted_publishers"` // Name → Ed25519-Public-Key (base64)
+}
+
+// Google: OAuth-Client für den Google-Connector (Gmail, Kalender). Secret nur per Umgebung.
+type Google struct {
+	ClientID     string `yaml:"client_id"`
+	ClientSecret string `yaml:"-"` // FYLGJA_GOOGLE_CLIENT_SECRET
 }
 
 type TLS struct {
@@ -207,6 +214,8 @@ func applyEnv(c *Config) {
 	set(&c.Channels.Discord.Token, "FYLGJA_DISCORD_TOKEN")
 	set(&c.Fleet.RunPodAPIKey, "FYLGJA_RUNPOD_API_KEY")
 	set(&c.Router.ExternalToken, "FYLGJA_ROUTER_TOKEN")
+	set(&c.Google.ClientID, "FYLGJA_GOOGLE_CLIENT_ID")
+	set(&c.Google.ClientSecret, "FYLGJA_GOOGLE_CLIENT_SECRET")
 	set(&c.Auth.BootstrapEmail, "FYLGJA_BOOTSTRAP_EMAIL")
 }
 

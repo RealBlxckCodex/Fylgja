@@ -76,7 +76,11 @@ const pairing = ref<any>(null)
 const links = ref<any[]>([])
 const newLink = ref<any>(null)
 const channels = ref<any>({})
-async function loadChannels() { [links.value, channels.value] = await Promise.all([get(`/dots/${props.id}/links`), get('/channels')]) }
+const google = ref<any>({ available: false, connected: false })
+const gMode = ref('read')
+async function loadChannels() { [links.value, channels.value, google.value] = await Promise.all([get(`/dots/${props.id}/links`), get('/channels'), get(`/dots/${props.id}/google`)]) }
+async function googleConnect() { try { const r = await post(`/dots/${props.id}/google/connect`, { mode: gMode.value }); window.location.href = r.url } catch (e) { toast.err(e) } }
+async function googleDisconnect() { try { await del(`/dots/${props.id}/google`); toast.ok('Google getrennt'); loadChannels() } catch (e) { toast.err(e) } }
 async function pair() { try { pairing.value = await post(`/dots/${props.id}/pair`) } catch (e) { toast.err(e) } }
 async function createLink() { try { newLink.value = await post(`/dots/${props.id}/links`, { name: 'Laptop' }); loadChannels() } catch (e) { toast.err(e) } }
 async function revoke(l: any) { try { await del(`/links/${l.id}`); toast.ok('Link getrennt'); loadChannels() } catch (e) { toast.err(e) } }
@@ -107,6 +111,10 @@ async function saveSettings() {
 async function pulseNow() { try { const r = await post(`/pulse/${props.id}/run`); toast.ok(r.run_id ? 'Pulse gestartet' : 'Keine neuen Signale') } catch (e) { toast.err(e) } }
 
 onMounted(async () => {
+  const q = new URLSearchParams(window.location.search)
+  if (q.get('tab')) tab.value = q.get('tab')!
+  if (q.get('google') === 'ok') toast.ok('Google verbunden')
+  else if (q.get('google') === 'error') toast.err(new Error(q.get('msg') || 'Google-Verbindung fehlgeschlagen'))
   try { await loadDot(); initSettings(); await Promise.all([loadMessages(), loadRuns(), loadChannels()]) } catch (e) { toast.err(e) }
 })
 const autonomyText = ['L0 Vorsicht – jede Aktion wird gefragt', 'L1 Standard – Lesen/intern frei, extern fragen', 'L2 Vertraut – externe Änderungen auto-geprüft', 'L3 Autonom – nach Regeln, Kommunikation auto-geprüft']
@@ -157,6 +165,18 @@ const autonomyText = ['L0 Vorsicht – jede Aktion wird gefragt', 'L1 Standard �
           <div v-for="(h, k) in channels" :key="k" class="flex gap-2"><Status :s="h.ok ? 'active' : 'failed'" /><span class="mono">{{ k }}</span><span class="muted">{{ h.detail }}</span></div>
           <div v-if="!Object.keys(channels).length" class="muted">Keine Bots konfiguriert (FYLGJA_TELEGRAM_TOKEN / FYLGJA_DISCORD_TOKEN).</div>
         </div>
+      </Card>
+      <Card title="Google" subtitle="Gmail und Kalender · Zugriff jederzeit widerrufbar">
+        <template v-if="!google.available"><p class="text-sm muted">Nicht konfiguriert. Setze <span class="mono">FYLGJA_GOOGLE_CLIENT_ID</span> und <span class="mono">FYLGJA_GOOGLE_CLIENT_SECRET</span> (OAuth-Client aus der Google Cloud Console, Redirect-URI <span class="mono">/api/v1/connectors/google/callback</span>).</p></template>
+        <template v-else-if="google.connected">
+          <div class="flex items-center gap-2 text-sm"><Status s="active" /><span>{{ google.account }}</span><Badge :tone="google.access_mode === 'read_write' ? 'warn' : 'ok'">{{ google.access_mode === 'read_write' ? 'lesen & schreiben' : 'nur lesen' }}</Badge></div>
+          <p class="text-xs muted mt-3">Mail-Inhalte gelten als nicht vertrauenswürdig. Senden und Termine anlegen brauchen deine Freigabe.</p>
+          <Btn variant="ghost" class="mt-3" @click="googleDisconnect">Trennen</Btn>
+        </template>
+        <template v-else>
+          <p class="text-sm muted mb-3">Verbinde ein Google-Konto, damit {{ dot?.name }} Mails suchen und lesen sowie Termine ansehen kann.</p>
+          <div class="flex items-center gap-3"><select v-model="gMode" class="field"><option value="read">Nur lesen</option><option value="read_write">Lesen und schreiben</option></select><Btn @click="googleConnect">Mit Google verbinden</Btn></div>
+        </template>
       </Card>
       <Card title="Laptop-Link" subtitle="Optional · nur ausgehend · jede Aktion braucht Freigabe">
         <Btn variant="ghost" @click="createLink">Link-Zugang erzeugen</Btn>

@@ -24,6 +24,7 @@ import (
 	"github.com/realblxckcodex/fylgja/internal/audit"
 	"github.com/realblxckcodex/fylgja/internal/auth"
 	"github.com/realblxckcodex/fylgja/internal/channels"
+	"github.com/realblxckcodex/fylgja/internal/connectors/google"
 	"github.com/realblxckcodex/fylgja/internal/coord"
 	"github.com/realblxckcodex/fylgja/internal/events"
 	"github.com/realblxckcodex/fylgja/internal/fleet"
@@ -69,6 +70,7 @@ type Server struct {
 	HookKey       []byte // HMAC-Basis für Webhooks
 	SkillKey      []byte // Basis für Skill-Signaturen
 	SkillRegistry *skills.Registry
+	Google        *google.Client
 	Version       string
 
 	idem    sync.Map
@@ -316,6 +318,7 @@ func (s *Server) Handler() http.Handler {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/setup/status", s.setupStatus)
 		r.Post("/setup", s.setup)
+		r.Get("/connectors/google/callback", s.googleCallback)
 		r.Post("/auth/login", s.login)
 		r.Post("/auth/passkey/login/begin", s.passkeyLoginBegin)
 		r.Post("/auth/passkey/login/finish", s.passkeyLoginFinish)
