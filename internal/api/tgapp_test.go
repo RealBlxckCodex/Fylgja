@@ -74,11 +74,11 @@ func TestTelegramWebAppLogin(t *testing.T) {
 		t.Fatalf("session: %v %v", p, err)
 	}
 	for name, body := range map[string]string{
-		"unbekannter telegram-nutzer": signInit(tok, now, `{"id":5}`),
+		"unbekannter telegram-nutzer":  signInit(tok, now, `{"id":5}`),
 		"nicht verifizierte identität": signInit(tok, now, `{"id":999}`),
-		"anderer bot":                 signInit("999:fremd", now, `{"id":4711}`),
-		"abgelaufen":                  signInit(tok, now.Add(-3*time.Hour), `{"id":4711}`),
-		"müll":                        "foo=bar",
+		"anderer bot":                  signInit("999:fremd", now, `{"id":4711}`),
+		"abgelaufen":                   signInit(tok, now.Add(-3*time.Hour), `{"id":4711}`),
+		"müll":                         "foo=bar",
 	} {
 		if w := do(body); w.Code != 401 || len(w.Result().Cookies()) != 0 {
 			t.Errorf("%s: %d", name, w.Code)
