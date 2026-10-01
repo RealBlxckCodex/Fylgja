@@ -6,6 +6,7 @@ export const router = createRouter({
   routes: [
     { path: '/login', component: () => import('./views/LoginView.vue'), meta: { public: true } },
     { path: '/setup', component: () => import('./views/SetupView.vue'), meta: { public: true } },
+    { path: '/tg', component: () => import('./views/TgView.vue'), meta: { public: true } },
     { path: '/', component: () => import('./views/HomeView.vue') },
     { path: '/dots', component: () => import('./views/DotsView.vue') },
     { path: '/dots/:id', component: () => import('./views/DotView.vue'), props: true },

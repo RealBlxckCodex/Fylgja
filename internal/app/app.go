@@ -257,7 +257,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger, ui http.Handl
 		}
 		skillReg = &skills.Registry{HTTP: guard.Client(20 * time.Second), URLs: cfg.Skills.Registries, Trust: trust}
 	}
-	a.API = &api.Server{SkillRegistry: skillReg, Google: a.Google, Microsoft: a.Microsoft, Pool: pool, Auth: a.Auth, Passkeys: a.Passkeys, Runtime: a.Engine, Memory: a.Memory, Hub: a.Hub, Bus: a.Bus,
+	a.API = &api.Server{SkillRegistry: skillReg, TelegramToken: tgMiniAppToken(cfg), Google: a.Google, Microsoft: a.Microsoft, Pool: pool, Auth: a.Auth, Passkeys: a.Passkeys, Runtime: a.Engine, Memory: a.Memory, Hub: a.Hub, Bus: a.Bus,
 		Router: a.Router, Fleet: a.Fleet, Tunnel: a.Tunnel, NodeCA: a.NodeCA, Links: a.Links, Coord: a.Coord, Pulse: a.Pulse, Tools: a.Tools, Sandbox: a.Sandbox, Audit: a.Audit,
 		Keyring: a.Keyring, Redactor: a.Redactor, Log: log, UI: ui, BaseURL: cfg.BaseURL, Secure: strings.HasPrefix(cfg.BaseURL, "https://"),
 		RouterToken: cfg.Router.ExternalToken, HookKey: derive(master, "hooks"), SkillKey: derive(master, "skills"), Version: version}
@@ -364,7 +364,7 @@ func (a *App) runChannels(ctx context.Context) {
 		a.Log.Info("kanäle: leader")
 		var wg sync.WaitGroup
 		if a.Cfg.Channels.Telegram.Enabled {
-			bot := &telegram.Bot{Token: a.Cfg.Channels.Telegram.Token, APIBase: a.Cfg.Channels.Telegram.APIBase, Mode: a.Cfg.Channels.Telegram.Mode,
+			bot := &telegram.Bot{MiniAppURL: miniAppURL(a.Cfg), Token: a.Cfg.Channels.Telegram.Token, APIBase: a.Cfg.Channels.Telegram.APIBase, Mode: a.Cfg.Channels.Telegram.Mode,
 				WebhookSecret: a.Cfg.Channels.Telegram.WebhookSecret, Log: a.Log}
 			wg.Add(1)
 			go func() { defer wg.Done(); a.Hub.Run(ctx, bot, uuid.Nil) }()
@@ -569,4 +569,19 @@ func (a *App) credential(ctx context.Context, dot, id uuid.UUID) (sandbox.Creden
 	a.Redactor.Register(c.TOTPSecret)
 	_ = a.Audit.Log(ctx, audit.Entry{WorkspaceID: ws, Actor: "dot:" + dot.String(), Action: "vault.use", Target: id.String(), Detail: map[string]any{"purpose": "browser.login"}})
 	return c, nil
+}
+
+// tgMiniAppToken: Die Mini App ist nur aktiv, wenn der Bot läuft und die Instanz per https erreichbar ist.
+func tgMiniAppToken(cfg config.Config) string {
+	if cfg.Channels.Telegram.Enabled && strings.HasPrefix(cfg.BaseURL, "https://") {
+		return cfg.Channels.Telegram.Token
+	}
+	return ""
+}
+
+func miniAppURL(cfg config.Config) string {
+	if tgMiniAppToken(cfg) == "" {
+		return ""
+	}
+	return strings.TrimRight(cfg.BaseURL, "/") + "/tg"
 }

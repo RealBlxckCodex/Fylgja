@@ -73,6 +73,7 @@ type Server struct {
 	SkillRegistry *skills.Registry
 	Google        *google.Client
 	Microsoft     *microsoft.Client
+	TelegramToken string // für die Prüfung der Mini-App-initData; leer = Mini App aus
 	Version       string
 
 	idem    sync.Map
@@ -137,6 +138,14 @@ func pathUUID(r *http.Request, name string) (uuid.UUID, error) {
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
+		if r.URL.Path == "/tg" || strings.HasPrefix(r.URL.Path, "/tg/") {
+			// Mini App: läuft in Telegram (WebView oder iframe auf web.telegram.org) und lädt Telegrams Skript.
+			h.Set("X-Content-Type-Options", "nosniff")
+			h.Set("Referrer-Policy", "same-origin")
+			h.Set("Content-Security-Policy", "default-src 'self'; script-src 'self' https://telegram.org; img-src 'self' data: blob: https://telegram.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; frame-ancestors https://web.telegram.org https://webk.telegram.org https://webz.telegram.org; base-uri 'none'; form-action 'self'")
+			next.ServeHTTP(w, r)
+			return
+		}
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "same-origin")
@@ -323,6 +332,7 @@ func (s *Server) Handler() http.Handler {
 		r.Get("/connectors/google/callback", s.googleCallback)
 		r.Get("/connectors/microsoft/callback", s.microsoftCallback)
 		r.Post("/auth/login", s.login)
+		r.Post("/auth/telegram/webapp", s.telegramWebApp)
 		r.Post("/auth/passkey/login/begin", s.passkeyLoginBegin)
 		r.Post("/auth/passkey/login/finish", s.passkeyLoginFinish)
 		r.Group(func(r chi.Router) {

@@ -1,0 +1,1 @@
+import{u as e}from"./api-CDSEnVT8.js";var t=e(`toast`,{state:()=>({items:[]}),actions:{push(e,t=`info`){let n=Date.now()+Math.random();this.items.push({id:n,text:e,tone:t}),setTimeout(()=>this.items=this.items.filter(e=>e.id!==n),5e3)},err(e){this.push(e?.message||String(e),`err`)},ok(e){this.push(e,`ok`)}}});export{t};

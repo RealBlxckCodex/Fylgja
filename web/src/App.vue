@@ -11,7 +11,7 @@ const router = useRouter()
 const auth = useAuth()
 const toast = useToast()
 onStepUp(() => auth.requestStepUp())
-onUnauthorized(() => { auth.principal = null; router.push('/login') })
+onUnauthorized(() => { auth.principal = null; if (route.path !== '/tg') router.push('/login') })
 const bare = computed(() => route.meta.public)
 </script>
 <template>

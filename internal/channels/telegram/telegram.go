@@ -26,6 +26,7 @@ type Bot struct {
 	APIBase       string // https://api.telegram.org
 	Mode          string // polling|webhook
 	WebhookSecret string
+	MiniAppURL    string // https://…/tg: setzt den Menü-Knopf des Bots auf die Mini App
 	HTTP          *http.Client
 	Log           *slog.Logger
 
@@ -347,6 +348,11 @@ func (b *Bot) Start(ctx context.Context, h channels.InboundHandler) error {
 	}
 	b.id, b.username = strconv.FormatInt(me.ID, 10), me.Username
 	_ = b.call(ctx, "setMyCommands", map[string]any{"commands": commands}, nil)
+	if b.MiniAppURL != "" {
+		if err := b.SetMenuButton(ctx, b.MiniAppURL); err != nil {
+			b.log().Warn("mini-app-knopf", "err", err)
+		}
+	}
 	b.setHealth(true, "verbunden als @"+me.Username)
 	if b.Mode == "webhook" {
 		<-ctx.Done()
