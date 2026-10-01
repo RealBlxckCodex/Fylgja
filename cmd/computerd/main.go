@@ -28,7 +28,7 @@ func main() {
 	if b := os.Getenv("COMPUTERD_BROWSER_CMD"); b != "" {
 		browser = strings.Fields(b)
 	}
-	s := &computer.Server{Token: token, Root: root, Browser: browser, Log: log}
+	s := &computer.Server{Token: token, Root: root, Browser: browser, Log: log, Display: os.Getenv("DISPLAY")}
 	// Token nicht an Kindprozesse vererben.
 	_ = os.Unsetenv("COMPUTERD_TOKEN")
 	addr := os.Getenv("COMPUTERD_LISTEN")

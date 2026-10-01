@@ -275,6 +275,39 @@ func (m *Manager) Browser(ctx context.Context, dot uuid.UUID, action string, arg
 	return out.Text, out.Egress, err
 }
 
+// settle: Wartezeit nach einer Eingabe, bevor das Bildschirmfoto gemacht wird.
+const settle = 500 * time.Millisecond
+
+// Desktop führt eine Bildschirm-Aktion aus. Eingaben liefern automatisch ein frisches
+// Bildschirmfoto, außer args["screenshot"] ist false.
+func (m *Manager) Desktop(ctx context.Context, dot uuid.UUID, action string, args map[string]any) (string, string, error) {
+	var out struct {
+		Text  string `json:"text"`
+		Image string `json:"image"`
+	}
+	if err := m.call(ctx, dot, "/v1/desktop/"+url.PathEscape(action), args, &out); err != nil {
+		return "", "", err
+	}
+	if out.Image != "" || action == "screenshot" || action == "info" {
+		return out.Text, out.Image, nil
+	}
+	if v, ok := args["screenshot"].(bool); ok && !v {
+		return out.Text, "", nil
+	}
+	select {
+	case <-time.After(settle):
+	case <-ctx.Done():
+		return out.Text, "", ctx.Err()
+	}
+	var shot struct {
+		Image string `json:"image"`
+	}
+	if err := m.call(ctx, dot, "/v1/desktop/screenshot", map[string]any{}, &shot); err != nil {
+		return out.Text + " (Bildschirmfoto fehlgeschlagen: " + err.Error() + ")", "", nil
+	}
+	return out.Text, shot.Image, nil
+}
+
 // Login: Der Broker entschlüsselt das Secret und sendet es direkt an computerd; das Modell sieht nur das Ergebnis.
 func (m *Manager) Login(ctx context.Context, dot uuid.UUID, credID uuid.UUID, site string) (string, error) {
 	if m.Credentials == nil {

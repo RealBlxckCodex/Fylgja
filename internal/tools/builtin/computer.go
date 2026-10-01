@@ -137,6 +137,7 @@ func registerComputer(r *tools.Registry) {
 		t.Class = policy.WriteExternal
 		t.Preview = "Eingabe in {ref}"
 	}
+	registerDesktop(r)
 	r.MustRegister(&tools.Tool{Name: "browser.login", Class: policy.WriteExternal, Source: "builtin", Preview: "Login auf {site} mit hinterlegtem Zugang",
 		Description: "Meldet sich mit einem hinterlegten Zugang (Credential-ID) auf einer Seite an. Das Passwort sieht das Modell nie; der Zugang ist an erlaubte Domains gebunden.",
 		Schema:      obj(`"credential_id":{"type":"string"},"site":{"type":"string"}`, "credential_id", "site"),
@@ -236,4 +237,60 @@ func registerDelegation(r *tools.Registry) {
 			}
 			return tools.Result{Content: "skill-vorschlag angelegt; der owner prüft und aktiviert ihn."}, nil
 		}})
+}
+
+// registerDesktop: Der Bildschirm des eigenen Computers. Bildschirminhalt ist nicht vertrauenswürdig
+// (eine Webseite oder ein Dokument kann Anweisungen enthalten) und taintet daher den Lauf.
+func registerDesktop(r *tools.Registry) {
+	const num = `{"type":"integer"}`
+	def := func(name, desc string, class policy.Class, props, preview string, required ...string) {
+		action := strings.TrimPrefix(name, "desktop.")
+		r.MustRegister(&tools.Tool{Name: name, Class: class, Source: "builtin", Description: desc, Schema: obj(props, required...), Preview: preview,
+			Base: action != "drag" && action != "wait",
+			Handler: func(ctx context.Context, c tools.Call) (tools.Result, error) {
+				cp, err := computer(c)
+				if err != nil {
+					return tools.Result{Content: err.Error(), IsError: true}, nil
+				}
+				a, _ := args[map[string]any](c)
+				if a == nil {
+					a = map[string]any{}
+				}
+				act := action
+				if action == "click" {
+					b, _ := a["button"].(string)
+					dbl, _ := a["double"].(bool)
+					switch {
+					case b == "right":
+						act = "right_click"
+					case b == "middle":
+						act = "middle_click"
+					case dbl:
+						act = "double_click"
+					}
+				}
+				text, img, err := cp.Desktop(ctx, dotID(c), act, a)
+				if err != nil {
+					return tools.Result{Content: err.Error(), IsError: true}, nil
+				}
+				res := tools.Result{Content: text, Untrusted: true, Source: "desktop"}
+				if img != "" {
+					res.Images = []string{img}
+				}
+				return res, nil
+			}})
+	}
+	def("desktop.screenshot", "Bildschirmfoto des eigenen Desktops. Koordinaten für Klicks beziehen sich auf dieses Bild.", policy.Read, ``, "Bildschirmfoto")
+	def("desktop.click", "Klickt auf Bildschirmkoordinaten (x,y). button: left|right|middle, double: Doppelklick. Liefert danach ein neues Bildschirmfoto.", policy.Compute,
+		`"x":`+num+`,"y":`+num+`,"button":{"type":"string","enum":["left","right","middle"]},"double":{"type":"boolean"}`, "Klick bei ({x},{y})", "x", "y")
+	def("desktop.drag", "Zieht mit gedrückter linker Maustaste von (x,y) nach (to_x,to_y).", policy.Compute,
+		`"x":`+num+`,"y":`+num+`,"to_x":`+num+`,"to_y":`+num, "Ziehen ({x},{y}) → ({to_x},{to_y})", "x", "y", "to_x", "to_y")
+	def("desktop.type", "Tippt Text in das Fenster mit dem Fokus. Keine Passwörter tippen: dafür browser.login.", policy.Compute,
+		`"text":{"type":"string"}`, "Tippen: {text}", "text")
+	def("desktop.key", "Drückt Tasten oder Kombinationen, durch Leerzeichen getrennt, z. B. \"ctrl+l\", \"Return\", \"alt+Tab\".", policy.Compute,
+		`"keys":{"type":"string"}`, "Tasten: {keys}", "keys")
+	def("desktop.scroll", "Scrollt am Mauszeiger (optional an (x,y)). dy>0 nach unten, dy<0 nach oben, dx für seitlich.", policy.Compute,
+		`"x":`+num+`,"y":`+num+`,"dx":`+num+`,"dy":`+num, "Scrollen")
+	def("desktop.wait", "Wartet bis zu 10 Sekunden (ms), z. B. bis eine Seite geladen ist, und liefert dann ein Bildschirmfoto.", policy.Read,
+		`"ms":`+num, "Warten")
 }

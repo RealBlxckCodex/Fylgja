@@ -10,7 +10,7 @@ RUN mkdir -p web/dist && touch web/dist/.keep && go build -ldflags "-s -w" -o /o
 FROM mcr.microsoft.com/playwright:v1.55.0-noble
 ENV DEBIAN_FRONTEND=noninteractive DISPLAY=:1 HOME=/home/dot
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      xvfb x11vnc fluxbox novnc websockify xdotool git python3 python3-pip curl ca-certificates jq unzip \
+      xvfb x11vnc fluxbox novnc websockify xdotool imagemagick x11-utils git python3 python3-pip curl ca-certificates jq unzip \
       poppler-utils pandoc \
     && rm -rf /var/lib/apt/lists/* \
     && npm install -g @playwright/mcp@latest \

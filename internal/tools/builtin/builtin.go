@@ -35,6 +35,8 @@ type Computer interface {
 	List(ctx context.Context, dot uuid.UUID, path string) ([]FileInfo, error)
 	Browser(ctx context.Context, dot uuid.UUID, action string, args map[string]any) (string, []string, error)
 	Login(ctx context.Context, dot uuid.UUID, credentialID uuid.UUID, site string) (string, error)
+	// Desktop steuert den virtuellen Bildschirm; image ist ein data:-URL (JPEG), wenn ein Bildschirmfoto mitkommt.
+	Desktop(ctx context.Context, dot uuid.UUID, action string, args map[string]any) (text, image string, err error)
 }
 
 // FileInfo eines Eintrags.

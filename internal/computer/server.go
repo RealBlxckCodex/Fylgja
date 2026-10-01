@@ -36,6 +36,8 @@ type Server struct {
 	Shell   []string // ["bash","-lc"]
 	Browser []string // Playwright-MCP-Kommando, z. B. ["npx","@playwright/mcp@latest","--headless=false"]
 	Log     *slog.Logger
+	Display string // X11-Display für die Desktop-Steuerung (Standard :1)
+	Run     Runner // für Tests austauschbar
 
 	mu sync.Mutex
 	pw *mcp.Client
@@ -57,6 +59,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/fs/write", s.auth(s.write))
 	mux.HandleFunc("POST /v1/fs/list", s.auth(s.list))
 	mux.HandleFunc("POST /v1/browser/{action}", s.auth(s.browser))
+	mux.HandleFunc("POST /v1/desktop/{action}", s.auth(s.desktop))
 	return mux
 }
 

@@ -48,6 +48,8 @@ type Result struct {
 	// Data: strukturierte Daten (z. B. schema-validierte Subagent-Ergebnisse).
 	Data      any      `json:"data,omitempty"`
 	Artifacts []string `json:"artifacts,omitempty"`
+	// Images: Bilder (data:-URLs, z. B. Bildschirmfotos), die dem Modell als Bild gezeigt werden.
+	Images []string `json:"images,omitempty"`
 	// Egress: tatsächlich kontaktierte Domains (für Taint-Regel 2).
 	Egress []string `json:"egress,omitempty"`
 }
