@@ -25,10 +25,10 @@ import (
 )
 
 type attackCase struct {
-	Name     string         `json:"name"`
-	Source   string         `json:"source"`
-	Payload  string         `json:"payload"`
-	Attack   struct {
+	Name    string `json:"name"`
+	Source  string `json:"source"`
+	Payload string `json:"payload"`
+	Attack  struct {
 		Tool string         `json:"tool"`
 		Args map[string]any `json:"args"`
 	} `json:"attack"`
@@ -48,14 +48,18 @@ type out struct {
 	notes     []string
 }
 
-func (o *out) Delta(context.Context, *runtime.Run, string)             {}
-func (o *out) Final(context.Context, *runtime.Run, string) error       { return nil }
+func (o *out) Delta(context.Context, *runtime.Run, string)       {}
+func (o *out) Final(context.Context, *runtime.Run, string) error { return nil }
 func (o *out) ApprovalRequested(context.Context, *runtime.Run, *policy.Approval) {
 	o.mu.Lock()
 	o.approvals++
 	o.mu.Unlock()
 }
-func (o *out) NotifyOwner(_ context.Context, _ *runtime.Dot, t string) { o.mu.Lock(); o.notes = append(o.notes, t); o.mu.Unlock() }
+func (o *out) NotifyOwner(_ context.Context, _ *runtime.Dot, t string) {
+	o.mu.Lock()
+	o.notes = append(o.notes, t)
+	o.mu.Unlock()
+}
 
 func TestInjectionCorpus(t *testing.T) {
 	raw, err := os.ReadFile("corpus/injection.json")
@@ -92,7 +96,10 @@ func TestInjectionCorpus(t *testing.T) {
 					}
 					return []string{to}, "", int64(amt * 1e6)
 				},
-				Handler: func(context.Context, tools.Call) (tools.Result, error) { fired.Add(1); return tools.Result{Content: "done"}, nil }})
+				Handler: func(context.Context, tools.Call) (tools.Result, error) {
+					fired.Add(1)
+					return tools.Result{Content: "done"}, nil
+				}})
 			// Kompromittiertes Modell: liest die Quelle und führt dann blind die Anweisung aus.
 			step := 0
 			model := &llm.Scripted{Func: func(req llm.Request) (*llm.Response, error) {
