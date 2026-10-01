@@ -11,6 +11,7 @@ import Status from '@/components/Status.vue'
 import Badge from '@/components/Badge.vue'
 import Btn from '@/components/Btn.vue'
 import Chart from '@/components/Chart.vue'
+import Gauge from '@/components/Gauge.vue'
 import Empty from '@/components/Empty.vue'
 import Modal from '@/components/Modal.vue'
 const toast = useToast()
@@ -65,6 +66,7 @@ const queueChart = computed(() => {
 })
 const costChart = computed(() => ({ xAxis: { type: 'category', data: ['Flotte gesamt', 'davon zugeordnet', 'Leerlauf (Overhead)', 'Kosten gesamt heute'] }, yAxis: { type: 'value', name: '€' },
   series: [{ type: 'bar', data: [s.value.fleet_spend_today_micro_eur, Math.max(0, s.value.fleet_spend_today_micro_eur - s.value.fleet_overhead_micro_eur), s.value.fleet_overhead_micro_eur, s.value.cost_today_micro_eur].map((v) => ((v || 0) / 1e6).toFixed(2)) }] }))
+const topoH = computed(() => Math.min(620, Math.max(260, deps.value.length * 78, (fo.value?.agents?.length ?? 0) * 62)) + 'px')
 const whatIf = computed(() => {
   const ready = s.value.nodes_ready || 0
   const p95 = s.value.queue_wait_p95_ms || 0
@@ -97,35 +99,32 @@ async function addNode() { try { added.value = await post('/fleet/nodes', { name
     </div>
     <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
       <div v-for="k in [['GPU-Auslastung', pct(s.gpu_util)], ['Nodes ready', `${s.nodes_ready}/${s.nodes_total}`], ['Queue p95', ms(s.queue_wait_p95_ms)], ['Kosten heute', eur(s.cost_today_micro_eur)],
-        ['Flotte heute', eur(s.fleet_spend_today_micro_eur)], ['Leerlauf-Overhead', eur(s.fleet_overhead_micro_eur)], ['Sandboxen', `${s.sandboxes_running} ▶ · ${s.sandboxes_sleeping} ☾`]]" :key="k[0]" class="panel p-3">
-        <div class="text-[11px] muted">{{ k[0] }}</div><div class="mono text-lg mt-0.5">{{ k[1] }}</div>
+        ['Flotte heute', eur(s.fleet_spend_today_micro_eur)], ['Leerlauf-Overhead', eur(s.fleet_overhead_micro_eur)], ['Sandboxen', `${s.sandboxes_running} ▶ · ${s.sandboxes_sleeping} ☾`]]" :key="k[0]" class="panel p-4">
+        <div class="text-[11px] uppercase tracking-wider muted">{{ k[0] }}</div><div class="mono text-xl mt-1.5">{{ k[1] }}</div>
       </div>
     </div>
     <Tabs v-model="tab" :tabs="[{ id: 'topology', label: 'Topologie' }, { id: 'nodes', label: 'Nodes', badge: fo.nodes.length || undefined }, { id: 'router', label: 'Queue & Routing' },
       { id: 'agents', label: 'Agenten', badge: fo.agents.length || undefined }, { id: 'capacity', label: 'Kapazität & Kosten' }, { id: 'hosts', label: 'Sandbox-Hosts' }]" />
 
     <Card v-if="tab === 'topology'" title="Wo läuft welcher Agent?" subtitle="Agenten → Sandbox-Hosts → Modell-Deployments · Kantenstärke = Modellaufrufe (5 min) · rot umrandet = Circuit Breaker offen">
-      <Chart v-if="fo.agents.length || deps.length" :option="topo" height="520px" /><Empty v-else>Keine aktiven Agenten und keine Deployments.</Empty>
+      <Chart v-if="fo.agents.length || deps.length" :option="topo" :height="topoH" /><Empty v-else>Keine aktiven Agenten und keine Deployments.</Empty>
     </Card>
 
     <div v-else-if="tab === 'nodes'" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      <div v-for="n in fo.nodes" :key="n.id" class="panel p-4 space-y-3">
-        <div class="flex items-center gap-2"><span class="font-medium flex-1 truncate">{{ n.name }}</span><Status :s="n.state" /></div>
-        <div class="text-xs muted">{{ n.provider }} · {{ n.gpu_model || 'CPU' }}<span v-if="n.gpu_count"> ×{{ n.gpu_count }}</span> · {{ n.region || 'Region ?' }} · Tunnel {{ n.tunnel_state }}</div>
-        <div class="space-y-1.5 text-xs">
-          <div v-for="m in [['GPU', n.metrics.gpu_util], ['VRAM', n.metrics.vram_total_mb ? n.metrics.vram_used_mb / n.metrics.vram_total_mb : 0], ['KV-Cache', n.metrics.kv_cache_util], ['Prefix-Hits', n.metrics.prefix_hit_rate]]" :key="m[0]" class="flex items-center gap-2">
-            <span class="w-16 muted">{{ m[0] }}</span><div class="flex-1 h-1.5 rounded bg-[var(--panel-2)] overflow-hidden"><div class="h-full" :style="{ width: pct(m[1] as number), background: (m[1] as number) > 0.9 ? 'var(--warn)' : 'var(--accent-2)' }" /></div><span class="mono w-10 text-right">{{ pct(m[1] as number) }}</span>
-          </div>
+      <div v-for="n in fo.nodes" :key="n.id" class="panel p-5 space-y-4 rise">
+        <div class="flex items-center gap-2"><div class="min-w-0 flex-1"><div class="font-semibold truncate">{{ n.name }}</div><div class="text-xs muted truncate">{{ n.provider }} · {{ n.gpu_model || 'CPU' }}<span v-if="n.gpu_count"> ×{{ n.gpu_count }}</span> · {{ n.region || 'Region ?' }}</div></div><Status :s="n.state" /></div>
+        <div class="flex justify-between">
+          <div v-for="m in [['GPU', n.metrics.gpu_util], ['VRAM', n.metrics.vram_total_mb ? n.metrics.vram_used_mb / n.metrics.vram_total_mb : 0], ['KV', n.metrics.kv_cache_util]]" :key="m[0] as string" class="text-center"><Gauge :value="m[1] as number" :size="78" :label="m[0] as string" /></div>
         </div>
-        <div class="grid grid-cols-3 gap-2 text-xs mono">
-          <div><div class="muted">Requests</div>{{ n.metrics.running_reqs }} ▶ {{ n.metrics.queued_reqs }} ◷</div>
-          <div><div class="muted">Tokens/s</div>{{ Math.round(n.metrics.tokens_per_s || 0) }}</div>
-          <div><div class="muted">Temp/Leistung</div>{{ Math.round(n.metrics.temp_c || 0) }}° / {{ Math.round(n.metrics.power_w || 0) }} W</div>
-          <div><div class="muted">Kosten</div>{{ eur(n.hourly_cost_micro_eur) }}/h</div>
-          <div><div class="muted">Heartbeat</div>{{ ago(n.last_heartbeat) }}</div>
-          <div><div class="muted">Laufzeit seit</div>{{ dt(n.started_at) }}</div>
+        <div class="grid grid-cols-3 gap-3 text-xs mono">
+          <div><div class="muted font-sans text-[11px]">Requests</div>{{ n.metrics.running_reqs }} ▶ {{ n.metrics.queued_reqs }} ◷</div>
+          <div><div class="muted font-sans text-[11px]">Tokens/s</div>{{ Math.round(n.metrics.tokens_per_s || 0) }}</div>
+          <div><div class="muted font-sans text-[11px]">Temp · Leistung</div>{{ Math.round(n.metrics.temp_c || 0) }}° · {{ Math.round(n.metrics.power_w || 0) }} W</div>
+          <div><div class="muted font-sans text-[11px]">Kosten</div>{{ eur(n.hourly_cost_micro_eur) }}/h</div>
+          <div><div class="muted font-sans text-[11px]">Heartbeat</div>{{ ago(n.last_heartbeat) }}</div>
+          <div><div class="muted font-sans text-[11px]">Prefix-Hits</div>{{ pct(n.metrics.prefix_hit_rate) }}</div>
         </div>
-        <div class="flex flex-wrap gap-1"><Badge v-for="d in n.deployments || []" :key="d.served_model" tone="info">{{ d.model }} ← {{ d.served_model }}</Badge></div>
+        <div class="flex flex-wrap gap-1.5"><Badge v-for="d in n.deployments || []" :key="d.served_model" tone="info">{{ d.model }} ← {{ d.served_model }}</Badge></div>
         <div v-if="auth.can('own') && n.state !== 'gone'" class="flex gap-2"><Btn size="sm" variant="ghost" @click="nodeAction(n, 'drain')">Drain</Btn><Btn size="sm" variant="danger" @click="nodeAction(n, 'terminate')">Beenden</Btn></div>
       </div>
       <Empty v-if="!fo.nodes.length">Keine Nodes. Lege eine Scaling-Policy für RunPod an oder registriere einen lokalen Node (Ollama/llama.cpp).</Empty>

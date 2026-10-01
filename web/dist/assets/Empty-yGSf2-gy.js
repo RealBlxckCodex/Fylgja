@@ -1,1 +1,0 @@
-import{E as e,k as t,m as n}from"./flow-ekq7MiAz.js";var r=(e,t)=>{let n=e.__vccOpts||e;for(let[e,r]of t)n[e]=r;return n},i={},a={class:`text-center py-10 px-4 muted text-sm`};function o(r,i){return e(),n(`div`,a,[t(r.$slots,`default`)])}var s=r(i,[[`render`,o]]);export{s as t};

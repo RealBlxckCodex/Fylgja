@@ -1,0 +1,1 @@
+import{E as e,d as t,k as n,m as r,v as i,y as a}from"./flow-ekq7MiAz.js";import{t as o}from"./Emblem-CZAjdy1O.js";var s={class:`text-center py-12 px-6 muted text-sm flex flex-col items-center gap-3`},c={class:`max-w-md`},l=a({__name:`Empty`,setup(a){return(a,l)=>(e(),r(`div`,s,[i(o,{size:30,class:`opacity-30`}),t(`div`,c,[n(a.$slots,`default`)])]))}});export{l as t};

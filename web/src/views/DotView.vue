@@ -13,6 +13,7 @@ import Badge from '@/components/Badge.vue'
 import Journal from '@/components/Journal.vue'
 import MemoryBrowser from '@/components/MemoryBrowser.vue'
 import Empty from '@/components/Empty.vue'
+import Emblem from '@/components/Emblem.vue'
 const props = defineProps<{ id: string }>()
 const toast = useToast()
 const auth = useAuth()
@@ -111,30 +112,43 @@ const autonomyText = ['L0 Vorsicht – jede Aktion wird gefragt', 'L1 Standard �
 </script>
 <template>
   <div v-if="dot" class="space-y-4">
-    <div class="flex flex-wrap items-center gap-3">
-      <h1 class="text-xl font-semibold">{{ dot.name }}</h1><Status :s="dot.status" />
-      <Badge tone="muted">{{ dot.kind }}</Badge><Badge tone="accent">L{{ dot.autonomy_level }}</Badge><Badge tone="info">{{ dot.privacy_mode }}</Badge>
-      <span class="text-xs muted">Kosten heute <b class="mono">{{ eur(view.cost_today_micro_eur) }}</b></span>
+    <header class="panel panel-glow p-5 flex flex-wrap items-center gap-4">
+      <div class="size-14 rounded-2xl flex items-center justify-center shrink-0" :class="view.running ? 'aura' : ''" style="background: linear-gradient(145deg, rgba(255,74,92,.18), rgba(200,32,47,.04)); box-shadow: inset 0 0 0 1px var(--accent-glow)"><Emblem :size="32" glow /></div>
+      <div class="min-w-0">
+        <div class="flex items-center gap-2.5 flex-wrap"><h1 class="text-2xl font-semibold tracking-tight">{{ dot.name }}</h1><Status :s="dot.status" /></div>
+        <div class="flex flex-wrap gap-2 mt-2"><Badge tone="muted">{{ dot.kind }}</Badge><Badge tone="accent">Autonomie L{{ dot.autonomy_level }}</Badge><Badge tone="info">{{ dot.privacy_mode }}</Badge><Badge v-if="view.sandbox" tone="ok" icon="🖥">Computer {{ view.sandbox }}</Badge></div>
+      </div>
       <div class="flex-1" />
-      <RouterLink :to="`/computer/${id}`"><Btn variant="ghost" size="sm">🖥 Computer</Btn></RouterLink>
-      <Btn variant="ghost" size="sm" @click="pulseNow">⚡ Pulse jetzt</Btn>
-    </div>
+      <div class="text-right mr-2"><div class="text-[11px] uppercase tracking-wider muted">Kosten heute</div><div class="mono text-xl">{{ eur(view.cost_today_micro_eur) }}</div></div>
+      <div class="flex gap-2"><RouterLink :to="`/computer/${id}`"><Btn variant="ghost" size="sm">🖥 Computer</Btn></RouterLink><Btn variant="ghost" size="sm" @click="pulseNow">⚡ Pulse</Btn></div>
+    </header>
     <Tabs v-model="tab" :tabs="tabs" />
 
-    <div v-if="tab === 'chat'" class="panel flex flex-col h-[calc(100vh-15rem)] min-h-96">
-      <div ref="box" class="flex-1 overflow-auto p-4 space-y-3">
-        <div v-for="(m, i) in messages" :key="m.id || i" class="flex" :class="m.role === 'user' ? 'justify-end' : 'justify-start'">
-          <div class="max-w-[80%] rounded-xl px-4 py-2.5 text-sm whitespace-pre-wrap" :class="m.role === 'user' ? 'bg-accent text-white' : 'panel-2 border line'">
-            {{ m.text }}<div class="text-[10px] mt-1 opacity-60">{{ dt(m.created_at) }}<span v-if="m.trust && m.trust !== 'owner' && m.role === 'user'"> · {{ m.trust }}</span></div>
+    <div v-if="tab === 'chat'" class="panel flex flex-col h-[calc(100vh-18rem)] min-h-96 overflow-hidden">
+      <div ref="box" class="flex-1 overflow-auto px-5 py-6 space-y-5">
+        <div v-for="(m, i) in messages" :key="m.id || i" class="flex gap-3 rise" :class="m.role === 'user' ? 'flex-row-reverse' : ''">
+          <div v-if="m.role !== 'user'" class="size-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style="background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line)"><Emblem :size="18" /></div>
+          <div class="max-w-[78%]">
+            <div class="rounded-2xl px-4 py-3 text-[14.5px] leading-relaxed whitespace-pre-wrap" :class="m.role === 'user' ? 'bg-accent text-white rounded-br-md' : 'rounded-bl-md'" :style="m.role === 'user' ? '' : 'background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line)'">{{ m.text }}</div>
+            <div class="text-[10.5px] muted mt-1 px-1" :class="m.role === 'user' ? 'text-right' : ''">{{ dt(m.created_at) }}<span v-if="m.trust && m.trust !== 'owner' && m.role === 'user'"> · {{ m.trust }}</span></div>
           </div>
         </div>
-        <div v-if="liveRun" class="flex justify-start"><div class="max-w-[80%] rounded-xl px-4 py-2.5 text-sm panel-2 border line whitespace-pre-wrap">{{ live || '…' }}<span class="animate-pulse">▌</span></div></div>
+        <div v-if="liveRun" class="flex gap-3">
+          <div class="size-8 rounded-xl flex items-center justify-center shrink-0 aura" style="background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--accent-glow)"><Emblem :size="18" /></div>
+          <div class="max-w-[78%] rounded-2xl rounded-bl-md px-4 py-3 text-[14.5px] leading-relaxed whitespace-pre-wrap" style="background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line)">
+            <template v-if="live">{{ live }}<span class="animate-pulse accent">▌</span></template>
+            <span v-else class="inline-flex gap-1 py-1"><i v-for="n in 3" :key="n" class="size-1.5 rounded-full bg-[var(--muted)] animate-bounce" :style="{ animationDelay: n * 0.12 + 's' }" /></span>
+          </div>
+        </div>
         <Empty v-if="!messages.length && !liveRun">Schreib {{ dot.name }} eine Nachricht. Dieselbe Fylgja erreichst du auch über Discord und Telegram – der Kontext ist geteilt.</Empty>
       </div>
-      <form class="border-t line p-3 flex gap-2" @submit.prevent="send">
-        <label for="chat-input" class="sr-only">Nachricht</label>
-        <textarea id="chat-input" v-model="input" class="input resize-none" rows="2" placeholder="Nachricht… (Enter senden, Shift+Enter neue Zeile)" @keydown.enter.exact.prevent="send" />
-        <div class="flex flex-col gap-1"><Btn type="submit" :loading="sending">Senden</Btn><Btn v-if="liveRun" size="sm" variant="ghost" @click="stop">Stopp</Btn></div>
+      <form class="p-4 pt-0" @submit.prevent="send">
+        <div class="flex gap-2 items-end rounded-2xl p-2 pl-4" style="background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line-strong)">
+          <label for="chat-input" class="sr-only">Nachricht</label>
+          <textarea id="chat-input" v-model="input" class="flex-1 bg-transparent outline-none resize-none py-2 max-h-40" rows="1" :placeholder="`Nachricht an ${dot.name}…`" @keydown.enter.exact.prevent="send" />
+          <Btn v-if="liveRun" size="sm" variant="ghost" @click="stop">■ Stopp</Btn>
+          <Btn type="submit" :loading="sending">Senden ↵</Btn>
+        </div>
       </form>
     </div>
 

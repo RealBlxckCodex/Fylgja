@@ -2,6 +2,8 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import { router } from './router'
+import '@fontsource-variable/inter'
+import '@fontsource-variable/jetbrains-mono'
 import './styles.css'
 
 const saved = (() => { try { return localStorage.getItem('fylgja-theme') } catch { return null } })()

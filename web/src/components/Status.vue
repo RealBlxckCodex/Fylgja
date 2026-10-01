@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Status nie nur über Farbe: Icon + Text (Barrierefreiheit, Spec 18.1).
+// Status nie nur über Farbe: Punkt/Icon + Text (Barrierefreiheit, Spec 18.1).
 import { computed } from 'vue'
 import Badge from './Badge.vue'
 const props = defineProps<{ s?: string }>()
@@ -15,6 +15,4 @@ const map: Record<string, [string, any, string]> = {
 }
 const v = computed(() => map[props.s ?? ''] ?? ['•', 'muted', props.s ?? '—'])
 </script>
-<template>
-  <Badge :tone="v[1]" :icon="v[0]">{{ v[2] }}</Badge>
-</template>
+<template><Badge :tone="v[1]" :icon="v[0]" :class="s === 'running' ? 'aura' : ''">{{ v[2] }}</Badge></template>
