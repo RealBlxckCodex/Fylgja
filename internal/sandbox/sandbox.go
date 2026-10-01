@@ -341,6 +341,88 @@ func DomainAllowed(host string, allowed []string) bool {
 	return false
 }
 
+// Status beschreibt den Zustand der Sandbox einer Fylgja, ohne sie aufzuwecken.
+type Status struct {
+	Provider   string     `json:"provider"`
+	State      string     `json:"state"` // none|creating|running|sleeping|error
+	Image      string     `json:"image,omitempty"`
+	LastActive *time.Time `json:"last_active_at,omitempty"`
+	Endpoint   string     `json:"endpoint,omitempty"`
+}
+
+func (m *Manager) Status(ctx context.Context, dot uuid.UUID) Status {
+	st := Status{State: "none"}
+	if m.Provider != nil {
+		st.Provider = m.Provider.Name()
+	}
+	var state, image string
+	var last *time.Time
+	if err := m.Pool.QueryRow(ctx, `SELECT state, coalesce(image,''), last_active_at FROM sandboxes WHERE dot_id=$1`, dot).Scan(&state, &image, &last); err == nil {
+		st.State, st.Image, st.LastActive = state, image, last
+	}
+	m.mu.Lock()
+	if l := m.cache[dot]; l != nil && time.Since(l.last) < m.idle() {
+		st.State = "running"
+	}
+	m.mu.Unlock()
+	return st
+}
+
+// Wake startet oder weckt die Sandbox.
+func (m *Manager) Wake(ctx context.Context, dot uuid.UUID) error {
+	_, err := m.ensure(ctx, dot)
+	return err
+}
+
+// Sleep legt die Sandbox schlafen (Home bleibt).
+func (m *Manager) Sleep(ctx context.Context, dot uuid.UUID) error {
+	if m.Provider == nil {
+		return ErrNoSandbox
+	}
+	m.mu.Lock()
+	l := m.cache[dot]
+	delete(m.cache, dot)
+	m.mu.Unlock()
+	ref := ""
+	if l != nil {
+		ref = l.inst.Ref
+	} else if m.Provider.Name() == "firecracker" {
+		ref = dot.String()
+	}
+	if ref == "" {
+		return nil
+	}
+	if err := m.Provider.Sleep(ctx, ref); err != nil {
+		return err
+	}
+	_, _ = m.Pool.Exec(ctx, `UPDATE sandboxes SET state='sleeping' WHERE dot_id=$1`, dot)
+	return nil
+}
+
+// Reset zerstört die Sandbox; mit keepHome bleibt das Home-Verzeichnis (Dateien, Browser-Profil) erhalten.
+func (m *Manager) Reset(ctx context.Context, dot uuid.UUID, keepHome bool) error {
+	if m.Provider == nil {
+		return ErrNoSandbox
+	}
+	m.mu.Lock()
+	l := m.cache[dot]
+	delete(m.cache, dot)
+	m.mu.Unlock()
+	ref := ""
+	if l != nil {
+		ref = l.inst.Ref
+	} else if m.Provider.Name() == "firecracker" {
+		ref = dot.String()
+	}
+	if ref != "" {
+		if err := m.Provider.Destroy(ctx, ref, keepHome); err != nil {
+			return err
+		}
+	}
+	_, err := m.Pool.Exec(ctx, `UPDATE sandboxes SET state='sleeping' WHERE dot_id=$1`, dot)
+	return err
+}
+
 // Session liefert die Live-View-Adresse (für den Proxy der API).
 func (m *Manager) Session(ctx context.Context, dot uuid.UUID) (Instance, string, error) {
 	l, err := m.ensure(ctx, dot)

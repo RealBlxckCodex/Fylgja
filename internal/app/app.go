@@ -166,7 +166,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger, ui http.Handl
 		a.Sandbox.Provider = &sandbox.Firecracker{Binary: fc.Binary, Kernel: fc.Kernel, Rootfs: fc.Rootfs, DataDir: fc.DataDir, HomeMB: fc.HomeMB, Subnet: fc.Subnet}
 	case "static":
 		if len(cfg.Sandbox.Hosts) > 0 {
-			a.Sandbox.Provider = &sandbox.Static{Endpoint: cfg.Sandbox.Hosts[0].Endpoint, Token: os.Getenv("FYLGJA_COMPUTERD_TOKEN")}
+			a.Sandbox.Provider = &sandbox.Static{Endpoint: cfg.Sandbox.Hosts[0].Endpoint, Token: os.Getenv("FYLGJA_COMPUTERD_TOKEN"), VNC: os.Getenv("FYLGJA_COMPUTERD_VNC")}
 		}
 	}
 

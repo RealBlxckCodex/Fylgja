@@ -875,6 +875,16 @@ func (e *Engine) result(ctx context.Context, run *Run, st *state, cs *callState,
 	return nil
 }
 
+// isComputerTool: Aktionen, die der Owner auf der Computer-Seite live sehen soll.
+func isComputerTool(name string) bool {
+	for _, p := range []string{"shell.", "fs.", "browser.", "desktop."} {
+		if strings.HasPrefix(name, p) {
+			return true
+		}
+	}
+	return false
+}
+
 func domainsOf(args map[string]any) []string {
 	var out []string
 	for _, k := range []string{"url", "endpoint", "href"} {
@@ -907,6 +917,9 @@ func (e *Engine) processCall(ctx context.Context, run *Run, dot *Dot, st *state,
 			cls = string(tool.Class)
 		}
 		e.publish(ctx, "run."+run.ID.String(), map[string]any{"type": "step", "step": "tool_call", "call_id": tc.ID, "tool": tc.Name, "class": cls, "args": pa})
+		if isComputerTool(tc.Name) {
+			e.publish(ctx, "dot."+run.DotID.String()+".activity", map[string]any{"type": "computer", "run": run.ID, "tool": tc.Name, "args": pa, "at": time.Now().UTC()})
+		}
 	}
 	if !known {
 		return e.result(ctx, run, st, cs, toolResultPayload{Content: "unbekanntes tool " + tc.Name + " – nutze tools.search", IsError: true})

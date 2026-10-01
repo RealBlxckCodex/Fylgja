@@ -4,14 +4,17 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -51,6 +54,12 @@ func (s *Server) routes(r chi.Router) {
 	r.With(need("work")).Patch("/memory/{mid}", s.patchMemory)
 	r.With(need("work")).Delete("/memory/{mid}", s.deleteMemory)
 	r.Get("/dots/{id}/computer", s.computerSession)
+	r.With(need("work")).Post("/dots/{id}/computer/wake", s.computerWake)
+	r.With(need("work")).Post("/dots/{id}/computer/takeover", s.computerTakeover)
+	r.With(need("work")).Post("/dots/{id}/computer/sleep", s.computerSleep)
+	r.With(need("manage"), stepUp).Delete("/dots/{id}/computer", s.computerReset)
+	r.Get("/dots/{id}/computer/file", s.computerFile)
+	r.Get("/dots/{id}/computer/screenshot", s.computerShot)
 	r.Handle("/dots/{id}/computer/vnc/*", s.vncProxy())
 	r.Get("/dots/{id}/links", s.listLinks)
 	r.With(need("work"), stepUp).Post("/dots/{id}/links", s.createLink)
@@ -414,14 +423,132 @@ func (s *Server) computerSession(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"available": false, "hint": "kein sandbox-provider konfiguriert (sandbox.provider)"})
 		return
 	}
-	inst, _, err := s.Sandbox.Session(r.Context(), id)
-	if err != nil {
+	st := s.Sandbox.Status(r.Context(), id)
+	out := map[string]any{"available": true, "status": st, "vnc": false}
+	// Ansehen weckt den Computer nicht auf; dafür gibt es den Wake-Button.
+	if st.State == "running" {
+		inst, _, err := s.Sandbox.Session(r.Context(), id)
+		if err != nil {
+			problem(w, 503, err.Error())
+			return
+		}
+		s.audit(r, "computer.view", id.String(), nil)
+		files, _ := s.Sandbox.List(r.Context(), id, ".")
+		out["vnc"], out["vnc_path"], out["files"] = inst.VNC != "", "/api/v1/dots/"+id.String()+"/computer/vnc/websockify", files
+	}
+	writeJSON(w, 200, out)
+}
+
+// computerTakeover protokolliert, dass der Owner die Steuerung übernimmt oder zurückgibt.
+func (s *Server) computerTakeover(w http.ResponseWriter, r *http.Request) {
+	id, err := pathUUID(r, "id")
+	if err != nil || s.dotInWorkspace(r, id) != nil {
+		problem(w, 404, "nicht gefunden")
+		return
+	}
+	var in struct {
+		Active bool `json:"active"`
+	}
+	if err := decode(r, &in); err != nil {
+		problem(w, 400, err.Error())
+		return
+	}
+	s.audit(r, "computer.takeover", id.String(), map[string]any{"active": in.Active})
+	writeJSON(w, 200, map[string]any{"ok": true})
+}
+
+func (s *Server) computerWake(w http.ResponseWriter, r *http.Request) {
+	id, err := pathUUID(r, "id")
+	if err != nil || s.dotInWorkspace(r, id) != nil || s.Sandbox == nil {
+		problem(w, 404, "nicht gefunden")
+		return
+	}
+	if err := s.Sandbox.Wake(r.Context(), id); err != nil {
 		problem(w, 503, err.Error())
 		return
 	}
-	s.audit(r, "computer.view", id.String(), nil)
-	files, _ := s.Sandbox.List(r.Context(), id, ".")
-	writeJSON(w, 200, map[string]any{"available": true, "vnc": inst.VNC != "", "vnc_path": "/api/v1/dots/" + id.String() + "/computer/vnc/websockify", "files": files})
+	s.audit(r, "computer.wake", id.String(), nil)
+	writeJSON(w, 200, map[string]any{"ok": true})
+}
+
+func (s *Server) computerSleep(w http.ResponseWriter, r *http.Request) {
+	id, err := pathUUID(r, "id")
+	if err != nil || s.dotInWorkspace(r, id) != nil || s.Sandbox == nil {
+		problem(w, 404, "nicht gefunden")
+		return
+	}
+	if err := s.Sandbox.Sleep(r.Context(), id); err != nil {
+		problem(w, 503, err.Error())
+		return
+	}
+	s.audit(r, "computer.sleep", id.String(), nil)
+	writeJSON(w, 200, map[string]any{"ok": true})
+}
+
+// computerReset zerstört den Computer. Mit keep_home=1 bleiben Dateien und Browser-Profil.
+func (s *Server) computerReset(w http.ResponseWriter, r *http.Request) {
+	id, err := pathUUID(r, "id")
+	if err != nil || s.dotInWorkspace(r, id) != nil || s.Sandbox == nil {
+		problem(w, 404, "nicht gefunden")
+		return
+	}
+	keep := r.URL.Query().Get("keep_home") != "0"
+	if err := s.Sandbox.Reset(r.Context(), id, keep); err != nil {
+		problem(w, 503, err.Error())
+		return
+	}
+	s.audit(r, "computer.reset", id.String(), map[string]any{"keep_home": keep})
+	writeJSON(w, 200, map[string]any{"ok": true, "keep_home": keep})
+}
+
+// computerFile lädt eine Datei aus dem Computer herunter (max. 20 MB, nur im Home).
+func (s *Server) computerFile(w http.ResponseWriter, r *http.Request) {
+	id, err := pathUUID(r, "id")
+	if err != nil || s.dotInWorkspace(r, id) != nil || s.Sandbox == nil {
+		problem(w, 404, "nicht gefunden")
+		return
+	}
+	p := r.URL.Query().Get("path")
+	if p == "" {
+		problem(w, 400, "path fehlt")
+		return
+	}
+	b, err := s.Sandbox.ReadFile(r.Context(), id, p)
+	if err != nil {
+		problem(w, 404, err.Error())
+		return
+	}
+	if len(b) > 20<<20 {
+		problem(w, 413, "datei größer als 20 MB")
+		return
+	}
+	s.audit(r, "computer.download", id.String(), map[string]any{"path": p, "bytes": len(b)})
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filepath.Base(p)}))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	_, _ = w.Write(b)
+}
+
+// computerShot liefert ein aktuelles Bildschirmfoto (JPEG), z. B. wenn die Live-Ansicht nicht verfügbar ist.
+func (s *Server) computerShot(w http.ResponseWriter, r *http.Request) {
+	id, err := pathUUID(r, "id")
+	if err != nil || s.dotInWorkspace(r, id) != nil || s.Sandbox == nil {
+		problem(w, 404, "nicht gefunden")
+		return
+	}
+	_, img, err := s.Sandbox.Desktop(r.Context(), id, "screenshot", map[string]any{})
+	if err != nil || !strings.HasPrefix(img, "data:image/jpeg;base64,") {
+		problem(w, 503, "kein bildschirmfoto verfügbar")
+		return
+	}
+	b, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(img, "data:image/jpeg;base64,"))
+	if err != nil {
+		problem(w, 500, "bild ungültig")
+		return
+	}
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(b)
 }
 
 func (s *Server) vncProxy() http.Handler {
