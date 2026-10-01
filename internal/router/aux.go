@@ -77,6 +77,24 @@ func (r *Router) Transcribe(ctx context.Context, model string, audio []byte, mim
 	return "", last
 }
 
+// Speak nutzt das logische Modell "tts" (Text → Sprache).
+func (r *Router) Speak(ctx context.Context, model, voice, text, format string) ([]byte, error) {
+	var last error = ErrNoAux
+	for _, d := range r.auxCandidates(model, llm.SelfHostedOnly) {
+		sp, ok := d.Client.(llm.Speaker)
+		if !ok {
+			continue
+		}
+		b, err := sp.Speak(ctx, d.ServedModel, voice, text, format)
+		r.auxDone(d, err)
+		if err == nil {
+			return b, nil
+		}
+		last = err
+	}
+	return nil, last
+}
+
 // HasModel meldet, ob ein logisches Modell im Katalog ist.
 func (r *Router) HasModel(name string) bool {
 	r.mu.Lock()

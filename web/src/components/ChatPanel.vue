@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
-import { ArrowUp, Square, Copy, ThumbsUp, ThumbsDown, RefreshCw, Check, ChevronDown, ShieldCheck, Plus } from 'lucide-vue-next'
+import { ArrowUp, Square, Copy, ThumbsUp, ThumbsDown, RefreshCw, Check, ChevronDown, ShieldCheck, Plus, Mic, MicOff } from 'lucide-vue-next'
+import { VoiceSession, voiceStatus, type VoiceState } from '@/lib/voice'
 import { get, post } from '@/lib/api'
 import { subscribe } from '@/lib/sse'
 import { renderMarkdown } from '@/lib/markdown'
@@ -32,6 +33,22 @@ const approvals = ref<any[]>([])
 let ticker: number | undefined
 let closeRun: (() => void) | null = null
 const copied = ref<string | null>(null)
+// Live-Gespräch (Sprache)
+const vcaps = ref({ stt: false, tts: false })
+const voiceState = ref<VoiceState>('idle')
+let voice: VoiceSession | null = null
+const stateLabel: Record<VoiceState, string> = { idle: '', listening: 'Ich höre zu …', hearing: 'Hört dich …', transcribing: 'Verstehe …', thinking: 'Denkt nach …', speaking: 'Spricht …' }
+async function toggleVoice() {
+  if (voice) { voice.stop(); voice = null; voiceState.value = 'idle'; return }
+  voice = new VoiceSession({
+    dotId: props.dot.id, speak: vcaps.value.tts,
+    onState: (s) => (voiceState.value = s),
+    onText: (t) => { void send(t) },
+    onBarge: () => { if (liveRun.value) post(`/runs/${liveRun.value}/cancel`).catch(() => {}) },
+    onError: (m) => toast.push(m, 'err'),
+  })
+  try { await voice.start() } catch (e: any) { voice = null; voiceState.value = 'idle'; toast.push(e?.name === 'NotAllowedError' ? 'Mikrofonzugriff wurde nicht erlaubt' : 'Mikrofon nicht verfügbar', 'err') }
+}
 // Verlauf-Schritte (lazy)
 const history = ref<Record<string, Step[]>>({})
 
@@ -39,12 +56,12 @@ function scrollDown(force = false) { nextTick(() => { const el = scroller.value;
 function onScroll() { const el = scroller.value!; atBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight < 120 }
 async function load() {
   const r = await get(`/dots/${props.dot.id}/messages`)
-  messages.value = r.messages; info.value = r.steps || {}
+  messages.value = r.messages || []; info.value = r.steps || {}
   fb.value = Object.fromEntries((r.feedback || []).map((f: any) => [f.message_id, f.kind]))
   scrollDown(true)
 }
-onMounted(() => { load().catch(toast.err); ticker = window.setInterval(() => (now.value = Date.now()), 500) })
-onBeforeUnmount(() => { closeRun?.(); clearInterval(ticker) })
+onMounted(() => { voiceStatus().then((v) => (vcaps.value = v)); load().catch(toast.err); ticker = window.setInterval(() => (now.value = Date.now()), 500) })
+onBeforeUnmount(() => { closeRun?.(); clearInterval(ticker); voice?.stop() })
 watch(() => props.dot.id, () => load().catch(toast.err))
 
 function autosize() { const el = ta.value; if (!el) return; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 220) + 'px' }
@@ -63,9 +80,10 @@ async function send(text?: string) {
 function watchRun(id: string) {
   closeRun?.()
   liveRun.value = id; liveText.value = ''; liveSteps.value = []; liveStart.value = Date.now(); approvals.value = []
+  voice?.beginAnswer()
   closeRun = subscribe([`run.${id}`, 'approvals'], (topic, d) => {
     if (topic === 'approvals') { if (d.approval?.run_id === id) loadApprovals(id); return }
-    if (d.type === 'delta') { liveText.value += d.text; scrollDown() }
+    if (d.type === 'delta') { liveText.value += d.text; voice?.feed(liveText.value); scrollDown() }
     else if (d.type === 'step') applyStep(d)
     else if (d.type === 'final' || (d.type === 'status' && ['succeeded', 'failed', 'cancelled'].includes(d.status))) {
       if (d.type === 'status' && d.status === 'failed') toast.push('Lauf fehlgeschlagen: ' + (d.error || ''), 'err')
@@ -74,6 +92,7 @@ function watchRun(id: string) {
   })
 }
 function finishRun() {
+  voice?.feed(liveText.value, true)
   closeRun?.(); closeRun = null
   const keep = liveSteps.value, dur = Date.now() - liveStart.value, rid = liveRun.value!
   liveRun.value = null; liveText.value = ''; approvals.value = []
@@ -118,7 +137,7 @@ async function loadHistory(m: Msg) {
   }
   history.value[m.id] = steps
 }
-watch(messages, (ms) => { for (const m of ms) if (m.role !== 'user') loadHistory(m).catch(() => {}) }, { deep: true, immediate: true })
+watch(messages, (ms) => { for (const m of ms || []) if (m.role !== 'user') loadHistory(m).catch(() => {}) }, { deep: true, immediate: true })
 const tryJSON = (x: any) => { if (typeof x !== 'string') return x; try { return JSON.parse(x) } catch { return x } }
 
 async function copy(m: Msg) { try { await navigator.clipboard.writeText(m.text); copied.value = m.id || ''; setTimeout(() => (copied.value = null), 1500) } catch { toast.push('Kopieren nicht möglich', 'err') } }
@@ -205,6 +224,11 @@ const canSend = computed(() => input.value.trim().length > 0 && !liveRun.value)
     <!-- Composer -->
     <div class="px-4 md:px-6 pb-4 pt-1">
       <form class="mx-auto max-w-3xl" @submit.prevent="send()">
+        <div v-if="voiceState !== 'idle'" class="flex items-center gap-3 px-4 py-2 mb-2 rounded-2xl text-sm" style="background: var(--panel-2)" role="status" aria-live="polite">
+          <span class="relative flex size-3"><span v-if="voiceState === 'hearing' || voiceState === 'speaking'" class="absolute inline-flex size-full rounded-full opacity-60 animate-ping bg-[var(--accent-2)]" /><span class="relative inline-flex size-3 rounded-full" :style="{ background: voiceState === 'listening' ? 'var(--ok)' : 'var(--accent-2)' }" /></span>
+          <span>{{ stateLabel[voiceState] }}</span>
+          <span class="text-xs muted ml-auto hidden sm:inline">{{ vcaps.tts ? 'Sprich einfach los. Du kannst jederzeit unterbrechen.' : 'Antworten erscheinen als Text (keine Sprachausgabe konfiguriert).' }}</span>
+        </div>
         <div class="rounded-[22px] p-2.5 transition-shadow focus-within:shadow-[0_0_0_3px_var(--accent-glow)]" style="background: var(--panel-solid); box-shadow: inset 0 0 0 1px var(--line-strong), 0 12px 40px -16px rgba(0,0,0,.8)">
           <label for="chat-input" class="sr-only">Nachricht</label>
           <textarea id="chat-input" ref="ta" v-model="input" rows="1" class="w-full bg-transparent outline-none resize-none px-3 pt-2 pb-1 text-[15px] leading-relaxed max-h-[220px]" :placeholder="`Nachricht an ${dot.name} …`"
@@ -216,6 +240,7 @@ const canSend = computed(() => input.value.trim().length > 0 && !liveRun.value)
             </div>
             <span class="text-[11px] muted hidden sm:inline">↵ senden · ⇧↵ Zeilenumbruch</span>
             <div class="flex-1" />
+            <button v-if="vcaps.stt" type="button" class="size-9 rounded-full flex items-center justify-center focus-ring transition-colors" :class="voiceState !== 'idle' ? 'bg-accent text-white' : 'muted hover:text-[var(--text)] hover:bg-[var(--panel-2)]'" :aria-pressed="voiceState !== 'idle'" :aria-label="voiceState !== 'idle' ? 'Live-Gespräch beenden' : 'Live-Gespräch starten'" @click="toggleVoice"><component :is="voiceState !== 'idle' ? MicOff : Mic" class="size-[18px]" /></button>
             <button v-if="liveRun" type="button" class="size-9 rounded-full flex items-center justify-center bg-[var(--text)] text-[var(--bg)] focus-ring" aria-label="Stopp" @click="stop"><Square class="size-3.5 fill-current" /></button>
             <button v-else type="submit" class="size-9 rounded-full flex items-center justify-center transition-all focus-ring" :class="canSend ? 'bg-accent text-white' : 'opacity-40'" :disabled="!canSend" aria-label="Senden"><ArrowUp class="size-[18px]" /></button>
           </div>

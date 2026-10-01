@@ -257,7 +257,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger, ui http.Handl
 		}
 		skillReg = &skills.Registry{HTTP: guard.Client(20 * time.Second), URLs: cfg.Skills.Registries, Trust: trust}
 	}
-	a.API = &api.Server{SkillRegistry: skillReg, TelegramToken: tgMiniAppToken(cfg), Google: a.Google, Microsoft: a.Microsoft, Pool: pool, Auth: a.Auth, Passkeys: a.Passkeys, Runtime: a.Engine, Memory: a.Memory, Hub: a.Hub, Bus: a.Bus,
+	a.API = &api.Server{SkillRegistry: skillReg, Voice: api.Voice{Router: a.Router}, TelegramToken: tgMiniAppToken(cfg), Google: a.Google, Microsoft: a.Microsoft, Pool: pool, Auth: a.Auth, Passkeys: a.Passkeys, Runtime: a.Engine, Memory: a.Memory, Hub: a.Hub, Bus: a.Bus,
 		Router: a.Router, Fleet: a.Fleet, Tunnel: a.Tunnel, NodeCA: a.NodeCA, Links: a.Links, Coord: a.Coord, Pulse: a.Pulse, Tools: a.Tools, Sandbox: a.Sandbox, Audit: a.Audit,
 		Keyring: a.Keyring, Redactor: a.Redactor, Log: log, UI: ui, BaseURL: cfg.BaseURL, Secure: strings.HasPrefix(cfg.BaseURL, "https://"),
 		RouterToken: cfg.Router.ExternalToken, HookKey: derive(master, "hooks"), SkillKey: derive(master, "skills"), Version: version}

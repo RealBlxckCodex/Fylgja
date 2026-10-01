@@ -73,6 +73,7 @@ type Server struct {
 	SkillRegistry *skills.Registry
 	Google        *google.Client
 	Microsoft     *microsoft.Client
+	Voice         Voice  // Sprach-Ein-/Ausgabe im Web-UI (nil-Felder = nicht verfügbar)
 	TelegramToken string // für die Prüfung der Mini-App-initData; leer = Mini App aus
 	Version       string
 
