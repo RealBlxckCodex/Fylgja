@@ -26,16 +26,17 @@ type Config struct {
 	MasterKey     string `yaml:"-"`
 	MasterKeyFile string `yaml:"master_key_file"`
 
-	TLS      TLS             `yaml:"tls"`
-	Auth     Auth            `yaml:"auth"`
-	Channels Channels        `yaml:"channels"`
-	Router   Router          `yaml:"router"`
-	Fleet    Fleet           `yaml:"fleet"`
-	Sandbox  Sandbox         `yaml:"sandbox"`
-	Runtime  Runtime         `yaml:"runtime"`
-	Skills   Skills          `yaml:"skills"`
-	Google   Google          `yaml:"google"`
-	Features map[string]bool `yaml:"features"`
+	TLS       TLS             `yaml:"tls"`
+	Auth      Auth            `yaml:"auth"`
+	Channels  Channels        `yaml:"channels"`
+	Router    Router          `yaml:"router"`
+	Fleet     Fleet           `yaml:"fleet"`
+	Sandbox   Sandbox         `yaml:"sandbox"`
+	Runtime   Runtime         `yaml:"runtime"`
+	Skills    Skills          `yaml:"skills"`
+	Google    Google          `yaml:"google"`
+	Microsoft Microsoft       `yaml:"microsoft"`
+	Features  map[string]bool `yaml:"features"`
 }
 
 // TLS lässt den Control Plane selbst TLS terminieren. Nötig für mTLS der Nodes
@@ -50,6 +51,13 @@ type Skills struct {
 type Google struct {
 	ClientID     string `yaml:"client_id"`
 	ClientSecret string `yaml:"-"` // FYLGJA_GOOGLE_CLIENT_SECRET
+}
+
+// Microsoft: App-Registrierung für den Microsoft-365-Connector (Outlook, Kalender). Secret nur per Umgebung.
+type Microsoft struct {
+	ClientID     string `yaml:"client_id"`
+	Tenant       string `yaml:"tenant"` // common (Standard), organizations oder eine Tenant-ID
+	ClientSecret string `yaml:"-"`      // FYLGJA_MICROSOFT_CLIENT_SECRET
 }
 
 type TLS struct {
@@ -227,6 +235,9 @@ func applyEnv(c *Config) {
 	set(&c.Router.ExternalToken, "FYLGJA_ROUTER_TOKEN")
 	set(&c.Google.ClientID, "FYLGJA_GOOGLE_CLIENT_ID")
 	set(&c.Google.ClientSecret, "FYLGJA_GOOGLE_CLIENT_SECRET")
+	set(&c.Microsoft.ClientID, "FYLGJA_MICROSOFT_CLIENT_ID")
+	set(&c.Microsoft.ClientSecret, "FYLGJA_MICROSOFT_CLIENT_SECRET")
+	set(&c.Microsoft.Tenant, "FYLGJA_MICROSOFT_TENANT")
 	set(&c.Auth.BootstrapEmail, "FYLGJA_BOOTSTRAP_EMAIL")
 }
 

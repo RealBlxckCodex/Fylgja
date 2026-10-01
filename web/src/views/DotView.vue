@@ -77,9 +77,13 @@ const links = ref<any[]>([])
 const newLink = ref<any>(null)
 const channels = ref<any>({})
 const google = ref<any>({ available: false, connected: false })
+const ms = ref<any>({ available: false, connected: false })
+const msMode = ref('read')
 const gMode = ref('read')
-async function loadChannels() { [links.value, channels.value, google.value] = await Promise.all([get(`/dots/${props.id}/links`), get('/channels'), get(`/dots/${props.id}/google`)]) }
+async function loadChannels() { [links.value, channels.value, google.value, ms.value] = await Promise.all([get(`/dots/${props.id}/links`), get('/channels'), get(`/dots/${props.id}/google`), get(`/dots/${props.id}/microsoft`)]) }
 async function googleConnect() { try { const r = await post(`/dots/${props.id}/google/connect`, { mode: gMode.value }); window.location.href = r.url } catch (e) { toast.err(e) } }
+async function msConnect() { try { const r = await post(`/dots/${props.id}/microsoft/connect`, { mode: msMode.value }); window.location.href = r.url } catch (e) { toast.err(e) } }
+async function msDisconnect() { try { await del(`/dots/${props.id}/microsoft`); toast.ok('Microsoft getrennt'); loadChannels() } catch (e) { toast.err(e) } }
 async function googleDisconnect() { try { await del(`/dots/${props.id}/google`); toast.ok('Google getrennt'); loadChannels() } catch (e) { toast.err(e) } }
 async function pair() { try { pairing.value = await post(`/dots/${props.id}/pair`) } catch (e) { toast.err(e) } }
 async function createLink() { try { newLink.value = await post(`/dots/${props.id}/links`, { name: 'Laptop' }); loadChannels() } catch (e) { toast.err(e) } }
@@ -113,6 +117,8 @@ async function pulseNow() { try { const r = await post(`/pulse/${props.id}/run`)
 onMounted(async () => {
   const q = new URLSearchParams(window.location.search)
   if (q.get('tab')) tab.value = q.get('tab')!
+  if (q.get('microsoft') === 'ok') toast.ok('Microsoft verbunden')
+  else if (q.get('microsoft') === 'error') toast.err(new Error(q.get('msg') || 'Microsoft-Verbindung fehlgeschlagen'))
   if (q.get('google') === 'ok') toast.ok('Google verbunden')
   else if (q.get('google') === 'error') toast.err(new Error(q.get('msg') || 'Google-Verbindung fehlgeschlagen'))
   try { await loadDot(); initSettings(); await Promise.all([loadMessages(), loadRuns(), loadChannels()]) } catch (e) { toast.err(e) }
@@ -176,6 +182,18 @@ const autonomyText = ['L0 Vorsicht – jede Aktion wird gefragt', 'L1 Standard �
         <template v-else>
           <p class="text-sm muted mb-3">Verbinde ein Google-Konto, damit {{ dot?.name }} Mails suchen und lesen sowie Termine ansehen kann.</p>
           <div class="flex items-center gap-3"><select v-model="gMode" class="field"><option value="read">Nur lesen</option><option value="read_write">Lesen und schreiben</option></select><Btn @click="googleConnect">Mit Google verbinden</Btn></div>
+        </template>
+      </Card>
+      <Card title="Microsoft 365" subtitle="Outlook-Mail und Kalender · Zugriff jederzeit widerrufbar">
+        <template v-if="!ms.available"><p class="text-sm muted">Nicht konfiguriert. Setze <span class="mono">FYLGJA_MICROSOFT_CLIENT_ID</span> und <span class="mono">FYLGJA_MICROSOFT_CLIENT_SECRET</span> (App-Registrierung im Entra-Portal, Redirect-URI <span class="mono">/api/v1/connectors/microsoft/callback</span>).</p></template>
+        <template v-else-if="ms.connected">
+          <div class="flex items-center gap-2 text-sm"><Status s="active" /><span>{{ ms.account }}</span><Badge :tone="ms.access_mode === 'read_write' ? 'warn' : 'ok'">{{ ms.access_mode === 'read_write' ? 'lesen & schreiben' : 'nur lesen' }}</Badge></div>
+          <p class="text-xs muted mt-3">Mail-Inhalte gelten als nicht vertrauenswürdig. Senden und Termine anlegen brauchen deine Freigabe.</p>
+          <Btn variant="ghost" class="mt-3" @click="msDisconnect">Trennen</Btn>
+        </template>
+        <template v-else>
+          <p class="text-sm muted mb-3">Verbinde ein Microsoft-Konto, damit {{ dot?.name }} Mails suchen und lesen sowie Termine ansehen kann.</p>
+          <div class="flex items-center gap-3"><select v-model="msMode" class="field"><option value="read">Nur lesen</option><option value="read_write">Lesen und schreiben</option></select><Btn @click="msConnect">Mit Microsoft verbinden</Btn></div>
         </template>
       </Card>
       <Card title="Laptop-Link" subtitle="Optional · nur ausgehend · jede Aktion braucht Freigabe">

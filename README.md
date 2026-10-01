@@ -29,8 +29,8 @@ Telegram/Discord, Pulse, Lernschleife, Skills (Signatur/Scanner), Sandbox (Docke
 **Nicht live gegen echte Dienste verifiziert** (kein Zugriff in der Build-Umgebung): RunPod-API, Discord-Gateway,
 Telegram-Server, Docker/gVisor-Sandboxen, Playwright-MCP-Browser, WebAuthn im Browser. Diese Teile sind per
 Mock-/Unit-Tests abgedeckt; vor Produktivbetrieb bitte einmal Ende-zu-Ende prüfen.
-Nicht umgesetzt: Live-Voice (Phase 12), Microsoft-365-Connector, Telegram Mini App.
+Nicht umgesetzt: Live-Voice (Phase 12), Telegram Mini App.
 Der Firecracker-Provider ist nur gegen einen Fake der Firecracker-API getestet (kein KVM in der Entwicklungsumgebung).
-Der Google-Connector (Gmail, Kalender) ist nur gegen einen lokalen Fake-Server getestet, nicht gegen Google selbst.
+Der Google- und der Microsoft-365-Connector (Mail, Kalender) sind nur gegen einen lokalen Fake-Server getestet, nicht gegen die echten Dienste.
 
 MIT-Lizenz.

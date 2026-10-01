@@ -25,6 +25,7 @@ import (
 	"github.com/realblxckcodex/fylgja/internal/auth"
 	"github.com/realblxckcodex/fylgja/internal/channels"
 	"github.com/realblxckcodex/fylgja/internal/connectors/google"
+	"github.com/realblxckcodex/fylgja/internal/connectors/microsoft"
 	"github.com/realblxckcodex/fylgja/internal/coord"
 	"github.com/realblxckcodex/fylgja/internal/events"
 	"github.com/realblxckcodex/fylgja/internal/fleet"
@@ -71,6 +72,7 @@ type Server struct {
 	SkillKey      []byte // Basis für Skill-Signaturen
 	SkillRegistry *skills.Registry
 	Google        *google.Client
+	Microsoft     *microsoft.Client
 	Version       string
 
 	idem    sync.Map
@@ -319,6 +321,7 @@ func (s *Server) Handler() http.Handler {
 		r.Get("/setup/status", s.setupStatus)
 		r.Post("/setup", s.setup)
 		r.Get("/connectors/google/callback", s.googleCallback)
+		r.Get("/connectors/microsoft/callback", s.microsoftCallback)
 		r.Post("/auth/login", s.login)
 		r.Post("/auth/passkey/login/begin", s.passkeyLoginBegin)
 		r.Post("/auth/passkey/login/finish", s.passkeyLoginFinish)

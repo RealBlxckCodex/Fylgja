@@ -26,6 +26,7 @@ import (
 	"github.com/realblxckcodex/fylgja/internal/channels/discord"
 	"github.com/realblxckcodex/fylgja/internal/channels/telegram"
 	"github.com/realblxckcodex/fylgja/internal/connectors/google"
+	"github.com/realblxckcodex/fylgja/internal/connectors/microsoft"
 	"github.com/realblxckcodex/fylgja/internal/coord"
 	"github.com/realblxckcodex/fylgja/internal/events"
 	"github.com/realblxckcodex/fylgja/internal/fleet"
@@ -51,32 +52,33 @@ import (
 
 // App hält alle Komponenten.
 type App struct {
-	Cfg      config.Config
-	Log      *slog.Logger
-	Pool     *pgxpool.Pool
-	Keyring  *vault.Keyring
-	Redactor *vault.Redactor
-	Audit    *audit.PG
-	Router   *router.Router
-	Fleet    *fleet.Manager
-	Tunnel   *tunnel.Server
-	NodeCA   *pki.CA
-	Google   *google.Client
-	Tools    *tools.Registry
-	Memory   *memory.Service
-	Engine   *runtime.Engine
-	Hub      *channels.Hub
-	Bus      *events.Bus
-	Pulse    *pulse.Engine
-	Coord    *coord.Coordinator
-	Learner  *learn.Learner
-	Sandbox  *sandbox.Manager
-	Links    *link.Registry
-	Auth     *auth.Service
-	Passkeys *auth.Passkeys
-	API      *api.Server
-	master   []byte
-	mcps     []*mcp.Client
+	Cfg       config.Config
+	Log       *slog.Logger
+	Pool      *pgxpool.Pool
+	Keyring   *vault.Keyring
+	Redactor  *vault.Redactor
+	Audit     *audit.PG
+	Router    *router.Router
+	Fleet     *fleet.Manager
+	Tunnel    *tunnel.Server
+	NodeCA    *pki.CA
+	Google    *google.Client
+	Microsoft *microsoft.Client
+	Tools     *tools.Registry
+	Memory    *memory.Service
+	Engine    *runtime.Engine
+	Hub       *channels.Hub
+	Bus       *events.Bus
+	Pulse     *pulse.Engine
+	Coord     *coord.Coordinator
+	Learner   *learn.Learner
+	Sandbox   *sandbox.Manager
+	Links     *link.Registry
+	Auth      *auth.Service
+	Passkeys  *auth.Passkeys
+	API       *api.Server
+	master    []byte
+	mcps      []*mcp.Client
 }
 
 // derive leitet zweckgebundene Schlüssel aus dem Master-Key ab.
@@ -104,7 +106,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger, ui http.Handl
 	a.master = master
 	a.Keyring = vault.NewKeyring(master)
 	a.Redactor = vault.NewRedactor()
-	for _, s := range []string{cfg.Google.ClientSecret, cfg.Channels.Telegram.Token, cfg.Channels.Discord.Token, cfg.Fleet.RunPodAPIKey, cfg.Router.ExternalToken, cfg.MasterKey} {
+	for _, s := range []string{cfg.Microsoft.ClientSecret, cfg.Google.ClientSecret, cfg.Channels.Telegram.Token, cfg.Channels.Discord.Token, cfg.Fleet.RunPodAPIKey, cfg.Router.ExternalToken, cfg.MasterKey} {
 		a.Redactor.Register(s)
 	}
 	a.Audit = &audit.PG{Pool: pool}
@@ -240,6 +242,13 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger, ui http.Handl
 		}
 		google.Register(a.Tools, a.Google)
 	}
+	if cfg.Microsoft.ClientID != "" && cfg.Microsoft.ClientSecret != "" {
+		a.Microsoft = &microsoft.Client{
+			Cfg:  microsoft.Config{ClientID: cfg.Microsoft.ClientID, ClientSecret: cfg.Microsoft.ClientSecret, Tenant: cfg.Microsoft.Tenant, RedirectURL: strings.TrimRight(cfg.BaseURL, "/") + "/api/v1/connectors/microsoft/callback"},
+			HTTP: guard.Client(30 * time.Second), Pool: pool, Keyring: a.Keyring, StateKey: derive(master, "microsoft-state"),
+		}
+		microsoft.Register(a.Tools, a.Microsoft)
+	}
 	var skillReg *skills.Registry
 	if len(cfg.Skills.Registries) > 0 {
 		trust, err := skills.ParseTrust(cfg.Skills.TrustedPublishers)
@@ -248,7 +257,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger, ui http.Handl
 		}
 		skillReg = &skills.Registry{HTTP: guard.Client(20 * time.Second), URLs: cfg.Skills.Registries, Trust: trust}
 	}
-	a.API = &api.Server{SkillRegistry: skillReg, Google: a.Google, Pool: pool, Auth: a.Auth, Passkeys: a.Passkeys, Runtime: a.Engine, Memory: a.Memory, Hub: a.Hub, Bus: a.Bus,
+	a.API = &api.Server{SkillRegistry: skillReg, Google: a.Google, Microsoft: a.Microsoft, Pool: pool, Auth: a.Auth, Passkeys: a.Passkeys, Runtime: a.Engine, Memory: a.Memory, Hub: a.Hub, Bus: a.Bus,
 		Router: a.Router, Fleet: a.Fleet, Tunnel: a.Tunnel, NodeCA: a.NodeCA, Links: a.Links, Coord: a.Coord, Pulse: a.Pulse, Tools: a.Tools, Sandbox: a.Sandbox, Audit: a.Audit,
 		Keyring: a.Keyring, Redactor: a.Redactor, Log: log, UI: ui, BaseURL: cfg.BaseURL, Secure: strings.HasPrefix(cfg.BaseURL, "https://"),
 		RouterToken: cfg.Router.ExternalToken, HookKey: derive(master, "hooks"), SkillKey: derive(master, "skills"), Version: version}

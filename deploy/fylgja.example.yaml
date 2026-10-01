@@ -69,3 +69,7 @@ features:
 
 # google:                       # Gmail/Kalender (ADR 0010); Secret per FYLGJA_GOOGLE_CLIENT_SECRET
 #   client_id: "…apps.googleusercontent.com"   # Redirect-URI: <base_url>/api/v1/connectors/google/callback
+
+# microsoft:                    # Outlook/Kalender (ADR 0012); Secret per FYLGJA_MICROSOFT_CLIENT_SECRET
+#   client_id: "<Anwendungs-ID aus dem Entra-Portal>"   # Redirect-URI: <base_url>/api/v1/connectors/microsoft/callback
+#   tenant: common
