@@ -30,6 +30,6 @@ Telegram/Discord, Pulse, Lernschleife, Skills (Signatur/Scanner), Sandbox (Docke
 Telegram-Server, Docker/gVisor-Sandboxen, Playwright-MCP-Browser, WebAuthn im Browser. Diese Teile sind per
 Mock-/Unit-Tests abgedeckt; vor Produktivbetrieb bitte einmal Ende-zu-Ende prüfen.
 Nicht umgesetzt: Firecracker, Live-Voice (Phase 12), Microsoft-365-/native Google-Connectoren, Skill-Marketplace,
-Telegram Mini App, kurzlebige mTLS-Zertifikate für Nodes (ADR 0006).
+Telegram Mini App.
 
 MIT-Lizenz.

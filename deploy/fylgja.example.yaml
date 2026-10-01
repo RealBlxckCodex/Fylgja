@@ -32,6 +32,7 @@ router:
 
 fleet:
   enabled: true
+  require_mtls: false          # true: Nodes brauchen ein kurzlebiges Client-Zertifikat (braucht tls.*)
   eval_interval: 15s
   pod_template:
     gpu_type: "NVIDIA L40S"      # ≥ 48 GB VRAM für das Hauptmodell
@@ -56,3 +57,7 @@ runtime:
 
 features:
   memory_extraction: true
+
+# tls:                          # nur nötig, wenn der Control Plane TLS selbst terminiert (mTLS)
+#   cert_file: /etc/fylgja/tls.crt
+#   key_file: /etc/fylgja/tls.key
