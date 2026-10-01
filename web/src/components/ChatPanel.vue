@@ -118,6 +118,7 @@ async function loadHistory(m: Msg) {
   }
   history.value[m.id] = steps
 }
+watch(messages, (ms) => { for (const m of ms) if (m.role !== 'user') loadHistory(m).catch(() => {}) }, { deep: true, immediate: true })
 const tryJSON = (x: any) => { if (typeof x !== 'string') return x; try { return JSON.parse(x) } catch { return x } }
 
 async function copy(m: Msg) { try { await navigator.clipboard.writeText(m.text); copied.value = m.id || ''; setTimeout(() => (copied.value = null), 1500) } catch { toast.push('Kopieren nicht möglich', 'err') } }
@@ -162,15 +163,13 @@ const canSend = computed(() => input.value.trim().length > 0 && !liveRun.value)
           <template v-for="(m, i) in messages" :key="m.id || i">
             <!-- Nutzer -->
             <div v-if="m.role === 'user'" class="flex justify-end rise">
-              <div class="max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap" style="background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line-strong)">{{ m.text }}</div>
+              <div class="max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5 text-[15px] leading-relaxed md" style="background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line-strong)" v-html="rendered(m.text)" />
             </div>
             <!-- Assistent -->
             <div v-else class="group flex gap-4 rise">
               <div class="size-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style="background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line)"><Emblem :size="18" /></div>
               <div class="min-w-0 flex-1">
-                <ThinkingBlock v-if="m.id && (info[m.id]?.tools.length || history[m.id]?.length)" :steps="history[m.id] || (info[m.id].tools.map((t, k) => ({ id: 'x' + k, kind: 'tool', tool: t, status: 'ok', at: 0 })) as any)" :elapsed-ms="info[m.id]?.duration_ms"
-                  @vue:before-mount="loadHistory(m)" />
-                <div v-if="m.id && info[m.id]?.tools.length && !history[m.id]" class="hidden">{{ loadHistory(m) }}</div>
+                <ThinkingBlock v-if="m.id && (info[m.id]?.tools.length || history[m.id]?.length)" :steps="history[m.id] || (info[m.id].tools.map((t, k) => ({ id: 'x' + k, kind: 'tool', tool: t, status: 'ok', at: 0 })) as any)" :elapsed-ms="info[m.id]?.duration_ms" />
                 <div class="md" v-html="rendered(m.text)" />
                 <div class="flex items-center gap-0.5 mt-2.5 -ml-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                   <button class="p-1.5 rounded-lg muted hover:text-[var(--text)] hover:bg-[var(--panel-2)] focus-ring" aria-label="Kopieren" @click="copy(m)"><Check v-if="copied === m.id" class="size-4" style="color: var(--ok)" /><Copy v-else class="size-4" /></button>

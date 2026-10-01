@@ -3,9 +3,8 @@
 import { ref, computed, watch } from 'vue'
 import { ChevronRight, Sparkles, Globe, Brain, Terminal, FileText, Wrench, ShieldCheck, Check, X, Send, ListChecks, Network } from 'lucide-vue-next'
 export interface Step { id: string; kind: 'thinking' | 'reasoning' | 'tool' | 'policy' | 'note'; tool?: string; cls?: string; args?: any; status?: 'running' | 'ok' | 'err' | 'ask' | 'denied'; preview?: string; text?: string; untrusted?: boolean; verdict?: string; reasons?: string[]; at: number; end?: number }
-const props = defineProps<{ steps: Step[]; live?: boolean; elapsedMs?: number; defaultOpen?: boolean }>()
-const open = ref(props.defaultOpen ?? !!props.live)
-watch(() => props.live, (v, o) => { if (o && !v) open.value = false; if (v && !o) open.value = true })
+const props = withDefaults(defineProps<{ steps: Step[]; live?: boolean; elapsedMs?: number; defaultOpen?: boolean }>(), { defaultOpen: true })
+const open = ref(props.defaultOpen)
 const label: Record<string, string> = {
   'web.search': 'Websuche', 'web.fetch': 'Seite gelesen', 'memory.search': 'Gedächtnis durchsucht', 'memory.write': 'Erinnerung gespeichert', 'shell.run': 'Befehl ausgeführt',
   'fs.read': 'Datei gelesen', 'fs.write': 'Datei geschrieben', 'fs.list': 'Ordner gelistet', 'task.create': 'Aufgabe angelegt', 'task.list': 'Aufgaben geprüft', 'notify.owner': 'Nachricht an dich',
