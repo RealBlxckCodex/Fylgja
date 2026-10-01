@@ -5,6 +5,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -32,11 +33,18 @@ type Config struct {
 	Fleet    Fleet           `yaml:"fleet"`
 	Sandbox  Sandbox         `yaml:"sandbox"`
 	Runtime  Runtime         `yaml:"runtime"`
+	Skills   Skills          `yaml:"skills"`
 	Features map[string]bool `yaml:"features"`
 }
 
 // TLS lässt den Control Plane selbst TLS terminieren. Nötig für mTLS der Nodes
 // (fleet.require_mtls); hinter einem Reverse-Proxy bleibt es leer.
+// Skills: Registries (statische JSON-Indizes) und die Publisher, deren Signaturen gelten.
+type Skills struct {
+	Registries        []string          `yaml:"registries"`
+	TrustedPublishers map[string]string `yaml:"trusted_publishers"` // Name → Ed25519-Public-Key (base64)
+}
+
 type TLS struct {
 	CertFile string `yaml:"cert_file"`
 	KeyFile  string `yaml:"key_file"`
@@ -215,6 +223,11 @@ func (c Config) Validate() error {
 	}
 	if c.Fleet.RequireMTLS && (c.TLS.CertFile == "" || c.TLS.KeyFile == "") {
 		errs = append(errs, errors.New("fleet.require_mtls braucht tls.cert_file und tls.key_file (der Control Plane muss TLS selbst terminieren)"))
+	}
+	for n, k := range c.Skills.TrustedPublishers {
+		if b, err := base64.StdEncoding.DecodeString(k); err != nil || len(b) != 32 {
+			errs = append(errs, fmt.Errorf("skills.trusted_publishers.%s: kein base64-kodierter Ed25519-Schlüssel", n))
+		}
 	}
 	if c.MasterKey == "" {
 		errs = append(errs, errors.New("FYLGJA_MASTER_KEY bzw. master_key_file fehlt"))

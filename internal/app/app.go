@@ -228,7 +228,15 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger, ui http.Handl
 	} else {
 		log.Warn("passkeys deaktiviert", "err", err)
 	}
-	a.API = &api.Server{Pool: pool, Auth: a.Auth, Passkeys: a.Passkeys, Runtime: a.Engine, Memory: a.Memory, Hub: a.Hub, Bus: a.Bus,
+	var skillReg *skills.Registry
+	if len(cfg.Skills.Registries) > 0 {
+		trust, err := skills.ParseTrust(cfg.Skills.TrustedPublishers)
+		if err != nil {
+			return nil, err
+		}
+		skillReg = &skills.Registry{HTTP: guard.Client(20 * time.Second), URLs: cfg.Skills.Registries, Trust: trust}
+	}
+	a.API = &api.Server{SkillRegistry: skillReg, Pool: pool, Auth: a.Auth, Passkeys: a.Passkeys, Runtime: a.Engine, Memory: a.Memory, Hub: a.Hub, Bus: a.Bus,
 		Router: a.Router, Fleet: a.Fleet, Tunnel: a.Tunnel, NodeCA: a.NodeCA, Links: a.Links, Coord: a.Coord, Pulse: a.Pulse, Tools: a.Tools, Sandbox: a.Sandbox, Audit: a.Audit,
 		Keyring: a.Keyring, Redactor: a.Redactor, Log: log, UI: ui, BaseURL: cfg.BaseURL, Secure: strings.HasPrefix(cfg.BaseURL, "https://"),
 		RouterToken: cfg.Router.ExternalToken, HookKey: derive(master, "hooks"), SkillKey: derive(master, "skills"), Version: version}

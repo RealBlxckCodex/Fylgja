@@ -35,39 +35,41 @@ import (
 	"github.com/realblxckcodex/fylgja/internal/router"
 	"github.com/realblxckcodex/fylgja/internal/runtime"
 	"github.com/realblxckcodex/fylgja/internal/sandbox"
+	"github.com/realblxckcodex/fylgja/internal/skills"
 	"github.com/realblxckcodex/fylgja/internal/tools"
 	"github.com/realblxckcodex/fylgja/internal/vault"
 )
 
 // Server bündelt alle Abhängigkeiten der API.
 type Server struct {
-	Pool        *pgxpool.Pool
-	Auth        *auth.Service
-	Passkeys    *auth.Passkeys
-	Runtime     *runtime.Engine
-	Memory      *memory.Service
-	Hub         *channels.Hub
-	Bus         *events.Bus
-	Router      *router.Router
-	Fleet       *fleet.Manager
-	Tunnel      *tunnel.Server
-	NodeCA      *pki.CA
-	Links       *link.Registry
-	Coord       *coord.Coordinator
-	Pulse       *pulse.Engine
-	Tools       *tools.Registry
-	Sandbox     *sandbox.Manager
-	Audit       *audit.PG
-	Keyring     *vault.Keyring
-	Redactor    *vault.Redactor
-	Log         *slog.Logger
-	UI          http.Handler // eingebettete Web-UI
-	BaseURL     string
-	Secure      bool   // Secure-Cookies (https)
-	RouterToken string // /router/v1 (leer = deaktiviert)
-	HookKey     []byte // HMAC-Basis für Webhooks
-	SkillKey    []byte // Basis für Skill-Signaturen
-	Version     string
+	Pool          *pgxpool.Pool
+	Auth          *auth.Service
+	Passkeys      *auth.Passkeys
+	Runtime       *runtime.Engine
+	Memory        *memory.Service
+	Hub           *channels.Hub
+	Bus           *events.Bus
+	Router        *router.Router
+	Fleet         *fleet.Manager
+	Tunnel        *tunnel.Server
+	NodeCA        *pki.CA
+	Links         *link.Registry
+	Coord         *coord.Coordinator
+	Pulse         *pulse.Engine
+	Tools         *tools.Registry
+	Sandbox       *sandbox.Manager
+	Audit         *audit.PG
+	Keyring       *vault.Keyring
+	Redactor      *vault.Redactor
+	Log           *slog.Logger
+	UI            http.Handler // eingebettete Web-UI
+	BaseURL       string
+	Secure        bool   // Secure-Cookies (https)
+	RouterToken   string // /router/v1 (leer = deaktiviert)
+	HookKey       []byte // HMAC-Basis für Webhooks
+	SkillKey      []byte // Basis für Skill-Signaturen
+	SkillRegistry *skills.Registry
+	Version       string
 
 	idem    sync.Map
 	limiter *limiter

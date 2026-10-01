@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -93,6 +94,8 @@ func (s *Server) routes(r chi.Router) {
 	r.With(need("own")).Put("/budgets", s.putBudget)
 
 	r.Get("/skills", s.listSkills)
+	r.Get("/skills/registry", s.registryList)
+	r.With(need("manage")).Post("/skills/registry/install", s.registryInstall)
 	r.With(need("manage"), stepUp).Post("/skills/{id}/activate", s.activateSkill)
 	r.With(need("manage")).Post("/skills/{id}/disable", s.disableSkill)
 	r.Get("/tools", s.listTools)
@@ -631,4 +634,51 @@ func (s *Server) revokeLink(w http.ResponseWriter, r *http.Request) {
 	}
 	s.audit(r, "link.revoke", id.String(), nil)
 	writeJSON(w, 200, map[string]any{"ok": true})
+}
+
+// registryList zeigt, was die konfigurierten Registries anbieten und ob die Signaturen gelten.
+func (s *Server) registryList(w http.ResponseWriter, r *http.Request) {
+	if s.SkillRegistry == nil {
+		writeJSON(w, 200, map[string]any{"configured": false, "skills": []any{}})
+		return
+	}
+	list, errs := s.SkillRegistry.List(r.Context())
+	if list == nil {
+		list = []skills.Listing{}
+	}
+	writeJSON(w, 200, map[string]any{"configured": true, "skills": list, "errors": errs})
+}
+
+// registryInstall legt einen geprüften Registry-Skill als Entwurf an. Aktivieren geht nur über
+// den normalen Weg (Scanner, Step-up, lokale Signatur).
+func (s *Server) registryInstall(w http.ResponseWriter, r *http.Request) {
+	if s.SkillRegistry == nil {
+		problem(w, 501, "keine skill-registry konfiguriert")
+		return
+	}
+	var in struct {
+		Registry string `json:"registry"`
+		Name     string `json:"name"`
+		Version  int    `json:"version"`
+	}
+	if err := decode(r, &in); err != nil || in.Name == "" {
+		problem(w, 400, "registry und name nötig")
+		return
+	}
+	e, err := s.SkillRegistry.Find(r.Context(), in.Registry, in.Name, in.Version)
+	if err != nil {
+		problem(w, 422, err.Error())
+		return
+	}
+	id, err := skills.Install(r.Context(), s.Pool, principal(r).WorkspaceID, *e)
+	if errors.Is(err, skills.ErrExists) {
+		problem(w, 409, err.Error())
+		return
+	}
+	if err != nil {
+		problem(w, 500, err.Error())
+		return
+	}
+	s.audit(r, "skill.install", id.String(), map[string]any{"name": e.Name, "version": e.Version, "publisher": e.Publisher, "registry": in.Registry})
+	writeJSON(w, 201, map[string]any{"id": id, "status": "draft", "hint": "Zum Aktivieren Scanner-Ergebnis prüfen und per Step-up freigeben."})
 }

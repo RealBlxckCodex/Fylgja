@@ -7,6 +7,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -20,6 +22,7 @@ import (
 	"time"
 
 	"github.com/realblxckcodex/fylgja/internal/audit"
+	"github.com/realblxckcodex/fylgja/internal/skills"
 	"github.com/realblxckcodex/fylgja/internal/store"
 )
 
@@ -108,6 +111,8 @@ const help = `fyctl – Fylgja-CLI
   fyctl fleet drain|terminate <node-id>
   fyctl memory export <dot-id> <ordner>
   fyctl pause-all [--hard] | resume-all
+  fyctl skill keygen                     Publisher-Schlüsselpaar erzeugen
+  fyctl skill sign <SKILL.md> --key <privkey-datei> --publisher <name> --version <n> [--out eintrag.json]
 `
 
 func main() {
@@ -305,6 +310,8 @@ func main() {
 			}
 		}
 		fmt.Printf("%d dateien exportiert nach %s\n", len(files), args[2])
+	case "skill":
+		skillCmd(args)
 	case "pause-all":
 		hard := len(args) > 0 && args[0] == "--hard"
 		var res map[string]any
@@ -316,5 +323,66 @@ func main() {
 	default:
 		fmt.Print(help)
 		os.Exit(2)
+	}
+}
+
+// skillCmd: Werkzeuge für Registry-Publisher (offline, ohne Server).
+func skillCmd(args []string) {
+	if len(args) == 0 {
+		die("skill keygen | skill sign …")
+	}
+	switch args[0] {
+	case "keygen":
+		pub, priv, err := ed25519.GenerateKey(nil)
+		if err != nil {
+			die(err.Error())
+		}
+		fmt.Println("public_key (in skills.trusted_publishers eintragen):", base64.StdEncoding.EncodeToString(pub))
+		fmt.Println("private_key (geheim halten):", base64.StdEncoding.EncodeToString(priv.Seed()))
+	case "sign":
+		fs := flag.NewFlagSet("skill sign", flag.ExitOnError)
+		keyFile := fs.String("key", "", "Datei mit dem base64-Seed des Publisher-Schlüssels")
+		pubName := fs.String("publisher", "", "Publisher-Name (wie in trusted_publishers)")
+		version := fs.Int("version", 1, "Version")
+		out := fs.String("out", "", "Ausgabedatei (Standard: stdout)")
+		file := ""
+		rest := args[1:]
+		if len(rest) > 0 && !strings.HasPrefix(rest[0], "-") {
+			file, rest = rest[0], rest[1:]
+		}
+		_ = fs.Parse(rest)
+		if file == "" || *keyFile == "" || *pubName == "" {
+			die("skill sign <SKILL.md> --key <datei> --publisher <name> [--version n]")
+		}
+		md, err := os.ReadFile(file)
+		if err != nil {
+			die(err.Error())
+		}
+		name, desc, man, body, err := skills.Parse(string(md))
+		if err != nil {
+			die(err.Error())
+		}
+		kb, err := os.ReadFile(*keyFile)
+		if err != nil {
+			die(err.Error())
+		}
+		seed, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(kb)))
+		if err != nil || len(seed) != ed25519.SeedSize {
+			die("schlüsseldatei: erwartet base64-kodierten 32-Byte-Seed")
+		}
+		e := skills.SignEntry(ed25519.NewKeyFromSeed(seed), *pubName, skills.Entry{Name: name, Version: *version, Description: desc, Body: body, Manifest: man})
+		if f := skills.Scan(e.Body, e.Files); len(f) > 0 {
+			die(fmt.Sprintf("scanner schlägt an (%s) – der Eintrag würde bei der Installation abgelehnt", f[0].Rule))
+		}
+		b, _ := json.MarshalIndent(e, "", "  ")
+		if *out != "" {
+			if err := os.WriteFile(*out, b, 0o644); err != nil {
+				die(err.Error())
+			}
+			return
+		}
+		fmt.Println(string(b))
+	default:
+		die("skill keygen | skill sign …")
 	}
 }
