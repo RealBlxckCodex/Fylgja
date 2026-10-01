@@ -73,3 +73,11 @@ features:
 # microsoft:                    # Outlook/Kalender (ADR 0012); Secret per FYLGJA_MICROSOFT_CLIENT_SECRET
 #   client_id: "<Anwendungs-ID aus dem Entra-Portal>"   # Redirect-URI: <base_url>/api/v1/connectors/microsoft/callback
 #   tenant: common
+
+# voice:                        # Sprache (ADR 0015): Aurora als STT/TTS-Engine
+#   aurora:                     # URL auch per FYLGJA_AURORA_URL, Schlüssel per FYLGJA_AURORA_API_KEY
+#     endpoint: "http://aurora:11435"
+#     stt_model: whisper-turbo
+#     tts_model: kokoro-v1
+#     voice: af_heart           # Voreinstellung; im UI unter Einstellungen → Sprache änderbar
+#     language: ""              # leer = automatisch erkennen

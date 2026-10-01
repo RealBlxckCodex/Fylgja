@@ -20,10 +20,12 @@ import (
 
 func TestVoiceEndpoints(t *testing.T) {
 	var gotTTS map[string]any
+	var gotLang string
 	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v1/audio/transcriptions":
 			r.ParseMultipartForm(1 << 20)
+			gotLang = r.FormValue("language")
 			if r.FormValue("model") != "whisper-x" {
 				w.WriteHeader(400)
 				return
@@ -88,6 +90,7 @@ func TestVoiceEndpoints(t *testing.T) {
 	if w.Code != 200 || w.Header().Get("Content-Type") != "audio/mpeg" || !strings.HasPrefix(w.Body.String(), "ID3") {
 		t.Fatalf("speak: %d %q", w.Code, w.Header())
 	}
+	_ = gotLang
 	if gotTTS["model"] != "kokoro" || gotTTS["input"] != "Hallo Sam" || gotTTS["response_format"] != "mp3" || gotTTS["voice"] != "alloy" {
 		t.Fatalf("tts-anfrage: %v", gotTTS)
 	}
@@ -104,6 +107,29 @@ func TestVoiceEndpoints(t *testing.T) {
 	mux.ServeHTTP(ww, r)
 	if ww.Code != 404 {
 		t.Fatalf("unbekannte fylgja: %d", ww.Code)
+	}
+	// Voreinstellungen: Stimme, Sprache und Tempo kommen aus den Workspace-Einstellungen.
+	put := func(body string) int {
+		r := httptest.NewRequest("PUT", "/voice/settings", strings.NewReader(body))
+		r = r.WithContext(context.WithValue(r.Context(), principalKey, p))
+		w := httptest.NewRecorder()
+		s.putVoiceSettings(w, r)
+		return w.Code
+	}
+	for _, bad := range []string{`{"voice":"a b"}`, `{"voice":"../x"}`, `{"language":"Deutsch"}`, `{"speed":3}`, `{"speed":0.1}`} {
+		if c := put(bad); c != 400 {
+			t.Fatalf("%s: %d", bad, c)
+		}
+	}
+	if c := put(`{"voice":"martin","language":"de","speed":1.25}`); c != 200 {
+		t.Fatalf("settings: %d", c)
+	}
+	gotTTS, gotLang = nil, ""
+	if w := do("/voice/speak", []byte(`{"text":"Hallo"}`), "application/json"); w.Code != 200 || gotTTS["voice"] != "martin" || gotTTS["speed"] != 1.25 {
+		t.Fatalf("einstellungen nicht genutzt: %d %v", w.Code, gotTTS)
+	}
+	if w := do("/voice/transcribe", audio, "audio/webm"); w.Code != 200 || gotLang != "de" {
+		t.Fatalf("sprache nicht übergeben: %d %q", w.Code, gotLang)
 	}
 	// Ohne Modelle: 501 statt Absturz.
 	s.Voice = Voice{Router: router.New(router.DefaultConfig(), nil, nil)}

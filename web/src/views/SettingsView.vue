@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { get, post, passkeys } from '@/lib/api'
+import { ref, computed, onMounted } from 'vue'
+import { get, post, put, passkeys } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import { useToast } from '@/stores/toast'
 import Card from '@/components/Card.vue'
@@ -14,6 +14,26 @@ const tab = ref('security')
 const skills = ref<any[]>([])
 const tools = ref<any[]>([])
 const channels = ref<any>({})
+const vc = ref<any>(null)
+const vset = ref({ voice: '', language: '', speed: 1 })
+const testText = ref('Hallo, ich bin deine Fylgja. So klinge ich.')
+const testing = ref(false)
+async function loadVoice() {
+  vc.value = await get('/voice/config')
+  vset.value = { voice: vc.value.settings.voice, language: vc.value.settings.language || '', speed: vc.value.settings.speed || 1 }
+}
+async function saveVoice() {
+  try { await put('/voice/settings', { voice: vset.value.voice, language: vset.value.language, speed: Number(vset.value.speed) }); toast.ok('Gespeichert'); loadVoice() } catch (e) { toast.err(e) }
+}
+async function testSpeak() {
+  testing.value = true
+  try {
+    const r = await fetch('/api/v1/voice/test/speak', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fylgja', 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ text: testText.value }) })
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Sprachausgabe fehlgeschlagen')
+    const a = new Audio(URL.createObjectURL(await r.blob())); await a.play()
+  } catch (e) { toast.err(e) } finally { testing.value = false }
+}
+const ttsVoices = computed(() => Object.entries(vc.value?.voices || {}) as [string, string[]][])
 const reg = ref<any>({ configured: false, skills: [], errors: [] })
 const token = ref<any>(null)
 const tf = ref({ name: 'fyctl', scopes: '*', ttl_days: 90 })
@@ -21,7 +41,7 @@ async function load() { ;[skills.value, tools.value, channels.value, reg.value] 
 async function install(r: any) {
   try { await post('/skills/registry/install', { registry: r.registry, name: r.name, version: r.version }); toast.ok('Als Entwurf installiert – bitte prüfen und aktivieren'); load() } catch (e) { toast.err(e) }
 }
-onMounted(() => load().catch(toast.err))
+onMounted(() => { load().catch(toast.err); loadVoice().catch(() => {}) })
 async function addPasskey() { try { await passkeys.register(); toast.ok('Passkey registriert'); auth.load() } catch (e) { toast.err(e) } }
 async function createToken() {
   try { token.value = await post('/auth/tokens', { name: tf.value.name, scopes: tf.value.scopes.split(',').map((s) => s.trim()).filter(Boolean), ttl_days: Number(tf.value.ttl_days) }) } catch (e) { toast.err(e) }
@@ -35,7 +55,7 @@ const classTone: Record<string, any> = { read: 'ok', write_internal: 'ok', compu
 <template>
   <div class="space-y-4">
     <h1 class="text-xl font-semibold">Einstellungen</h1>
-    <Tabs v-model="tab" :tabs="[{ id: 'security', label: 'Sicherheit' }, { id: 'skills', label: 'Skills' }, { id: 'tools', label: 'Werkzeuge' }, { id: 'channels', label: 'Kanäle' }]" />
+    <Tabs v-model="tab" :tabs="[{ id: 'security', label: 'Sicherheit' }, { id: 'skills', label: 'Skills' }, { id: 'tools', label: 'Werkzeuge' }, { id: 'voice', label: 'Sprache' }, { id: 'channels', label: 'Kanäle' }]" />
     <div v-if="tab === 'security'" class="grid gap-4 lg:grid-cols-2">
       <Card title="Passkeys" subtitle="Für Login und Step-up bei kritischen Aktionen">
         <p class="text-sm mb-3">Status: <Badge :tone="auth.hasPasskey ? 'ok' : 'warn'">{{ auth.hasPasskey ? 'registriert' : 'keiner' }}</Badge></p>
@@ -65,6 +85,47 @@ const classTone: Record<string, any> = { read: 'ok', write_internal: 'ok', compu
           <td><Btn v-if="r.verified" size="sm" @click="install(r)">Installieren</Btn></td></tr></tbody></table>
       <p v-if="reg.errors?.length" class="px-5 pb-4 text-xs" style="color: var(--warn)">{{ reg.errors.join(' · ') }}</p>
     </Card></div>
+    <div v-else-if="tab === 'voice'" class="space-y-4">
+      <Card title="Aurora" subtitle="Selbst gehostete Sprach-Engine für Spracherkennung und Sprachausgabe">
+        <template v-if="!vc?.aurora">
+          <p class="text-sm muted">Nicht konfiguriert. Setze <span class="mono">FYLGJA_AURORA_URL</span> (z. B. <span class="mono">http://aurora:11435</span>), optional <span class="mono">FYLGJA_AURORA_API_KEY</span>, und starte Fylgja neu. Fylgja legt dann die Modelle <span class="mono">stt</span> und <span class="mono">tts</span> selbst an. Alternativ kannst du die logischen Modelle <span class="mono">stt</span> und <span class="mono">tts</span> mit einem beliebigen OpenAI-kompatiblen Audio-Server belegen.</p>
+          <p class="text-sm mt-3"><Badge :tone="vc?.stt ? 'ok' : 'muted'">Spracherkennung {{ vc?.stt ? 'bereit' : 'fehlt' }}</Badge> <Badge :tone="vc?.tts ? 'ok' : 'muted'">Sprachausgabe {{ vc?.tts ? 'bereit' : 'fehlt' }}</Badge></p>
+        </template>
+        <template v-else>
+          <div class="flex items-center gap-2 flex-wrap text-sm">
+            <Badge :tone="vc.aurora.ok ? 'ok' : 'err'">{{ vc.aurora.ok ? 'erreichbar' : 'nicht erreichbar' }}</Badge>
+            <span class="mono text-xs">{{ vc.aurora.endpoint }}</span>
+            <span v-if="vc.aurora.version" class="muted text-xs">Version {{ vc.aurora.version }}{{ vc.aurora.latency_ms ? " · " + vc.aurora.latency_ms + " ms" : "" }}</span>
+          </div>
+          <p v-if="vc.aurora.error" class="text-sm mt-2" style="color: var(--err)">{{ vc.aurora.error }}</p>
+          <table v-if="vc.aurora.models.length" class="dense mt-4"><thead><tr><th>Modell</th><th>Typ</th><th>Backend</th><th>Geladen</th><th>Genutzt für</th></tr></thead>
+            <tbody><tr v-for="m in vc.aurora.models" :key="m.id"><td class="mono text-xs">{{ m.id }}</td><td>{{ m.type === 'tts' ? 'Sprachausgabe' : m.type === 'stt' ? 'Spracherkennung' : m.type }}</td><td>{{ m.backend }}</td><td>{{ m.loaded ? '✓' : '' }}</td>
+              <td><Badge v-if="m.id === vc.models.tts || m.id === vc.models.stt" tone="accent">aktiv</Badge></td></tr></tbody></table>
+          <p v-else-if="vc.aurora.ok" class="text-sm muted mt-3">Aurora läuft, hat aber noch keine Modelle geladen. Auf dem Aurora-Server: <span class="mono">aurora pull kokoro-v1</span> und <span class="mono">aurora pull whisper-turbo</span>.</p>
+          <p class="text-xs muted mt-3">Modelle werden auf dem Aurora-Server verwaltet (<span class="mono">aurora pull</span>, <span class="mono">aurora rm</span>); die aktiven Modelle stehen in der Fylgja-Konfiguration unter <span class="mono">voice.aurora</span>.</p>
+        </template>
+      </Card>
+      <Card v-if="vc?.tts || vc?.stt" title="Stimme und Sprache" subtitle="Gilt für alle Fylgjur dieses Workspaces">
+        <div class="grid gap-3 sm:grid-cols-3 max-w-2xl">
+          <label class="text-sm">Stimme
+            <select v-if="ttsVoices.length" v-model="vset.voice" class="input mt-1"><optgroup v-for="[model, list] in ttsVoices" :key="model" :label="model"><option v-for="v in list" :key="v" :value="v">{{ v }}</option></optgroup></select>
+            <input v-else v-model="vset.voice" class="input mt-1" placeholder="alloy" />
+          </label>
+          <label class="text-sm">Sprache (Erkennung)
+            <select v-if="vc?.aurora?.languages?.length" v-model="vset.language" class="input mt-1"><option value="">automatisch</option><option v-for="l in vc.aurora.languages" :key="l.code" :value="l.code">{{ l.native_name || l.name }} ({{ l.code }})</option></select>
+            <input v-else v-model="vset.language" class="input mt-1" placeholder="leer = automatisch, z. B. de" />
+          </label>
+          <label class="text-sm">Tempo {{ Number(vset.speed).toFixed(2) }}×
+            <input v-model="vset.speed" type="range" min="0.5" max="2" step="0.05" class="w-full mt-2" />
+          </label>
+        </div>
+        <div class="flex items-center gap-2 mt-4"><Btn @click="saveVoice">Speichern</Btn></div>
+        <div v-if="vc?.tts" class="mt-5 pt-4 border-t border-[var(--line)] max-w-2xl">
+          <label class="text-sm" for="vt">Probe anhören (nach dem Speichern)</label>
+          <div class="flex gap-2 mt-1"><input id="vt" v-model="testText" class="input flex-1" maxlength="300" /><Btn variant="ghost" :disabled="testing" @click="testSpeak">{{ testing ? 'Spricht …' : 'Abspielen' }}</Btn></div>
+        </div>
+      </Card>
+    </div>
     <Card v-else-if="tab === 'tools'" title="Werkzeuge" :subtitle="`${tools.length} registriert · Klasse bestimmt die Policy`" flush>
       <table class="dense"><thead><tr><th>Tool</th><th>Klasse</th><th>Quelle</th><th>Basis-Set</th><th>Beschreibung</th></tr></thead>
         <tbody><tr v-for="t in tools" :key="t.name"><td class="mono text-xs">{{ t.name }}</td><td><Badge :tone="classTone[t.class]">{{ t.class }}</Badge></td><td class="muted text-xs">{{ t.source }}</td><td>{{ t.base ? '✓' : '' }}</td><td class="text-xs muted">{{ t.description }}</td></tr></tbody></table>

@@ -36,6 +36,7 @@ type Config struct {
 	Skills    Skills          `yaml:"skills"`
 	Google    Google          `yaml:"google"`
 	Microsoft Microsoft       `yaml:"microsoft"`
+	Voice     Voice           `yaml:"voice"`
 	Features  map[string]bool `yaml:"features"`
 }
 
@@ -58,6 +59,21 @@ type Microsoft struct {
 	ClientID     string `yaml:"client_id"`
 	Tenant       string `yaml:"tenant"` // common (Standard), organizations oder eine Tenant-ID
 	ClientSecret string `yaml:"-"`      // FYLGJA_MICROSOFT_CLIENT_SECRET
+}
+
+// Voice: Sprach-Engine. Mit gesetztem aurora.endpoint legt Fylgja die logischen Modelle "stt" und "tts" samt
+// Deployments automatisch an (sofern nicht schon selbst definiert).
+type Voice struct {
+	Aurora Aurora `yaml:"aurora"`
+}
+
+type Aurora struct {
+	Endpoint string `yaml:"endpoint"`  // http://aurora:11435 (ohne /v1), auch FYLGJA_AURORA_URL
+	APIKey   string `yaml:"-"`         // FYLGJA_AURORA_API_KEY
+	STTModel string `yaml:"stt_model"` // Standard whisper-turbo
+	TTSModel string `yaml:"tts_model"` // Standard kokoro-v1
+	Voice    string `yaml:"voice"`     // Standard af_heart
+	Language string `yaml:"language"`  // STT-Sprache, leer = automatisch
 }
 
 type TLS struct {
@@ -238,6 +254,8 @@ func applyEnv(c *Config) {
 	set(&c.Microsoft.ClientID, "FYLGJA_MICROSOFT_CLIENT_ID")
 	set(&c.Microsoft.ClientSecret, "FYLGJA_MICROSOFT_CLIENT_SECRET")
 	set(&c.Microsoft.Tenant, "FYLGJA_MICROSOFT_TENANT")
+	set(&c.Voice.Aurora.Endpoint, "FYLGJA_AURORA_URL")
+	set(&c.Voice.Aurora.APIKey, "FYLGJA_AURORA_API_KEY")
 	set(&c.Auth.BootstrapEmail, "FYLGJA_BOOTSTRAP_EMAIL")
 }
 
@@ -260,6 +278,9 @@ func (c Config) Validate() error {
 	}
 	if c.Fleet.RequireMTLS && (c.TLS.CertFile == "" || c.TLS.KeyFile == "") {
 		errs = append(errs, errors.New("fleet.require_mtls braucht tls.cert_file und tls.key_file (der Control Plane muss TLS selbst terminieren)"))
+	}
+	if e := c.Voice.Aurora.Endpoint; e != "" && !strings.HasPrefix(e, "http://") && !strings.HasPrefix(e, "https://") {
+		errs = append(errs, errors.New("voice.aurora.endpoint muss mit http:// oder https:// beginnen"))
 	}
 	for n, k := range c.Skills.TrustedPublishers {
 		if b, err := base64.StdEncoding.DecodeString(k); err != nil || len(b) != 32 {

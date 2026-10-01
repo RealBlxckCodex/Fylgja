@@ -29,7 +29,7 @@ Telegram/Discord, Pulse, Lernschleife, Skills (Signatur/Scanner), Sandbox (Docke
 **Nicht live gegen echte Dienste verifiziert** (kein Zugriff in der Build-Umgebung): RunPod-API, Discord-Gateway,
 Telegram-Server, Docker/gVisor-Sandboxen, Playwright-MCP-Browser, WebAuthn im Browser. Diese Teile sind per
 Mock-/Unit-Tests abgedeckt; vor Produktivbetrieb bitte einmal Ende-zu-Ende prüfen.
-Nicht umgesetzt: Telefon/SIP-Sprache. Live-Gespräch im Browser (ADR 0014) ist nur mit Fake-Mikrofon und Mock-Modellen geprüft. Die Telegram Mini App (ADR 0013) ist nur lokal mit einem Telegram-Stub geprüft.
+Nicht umgesetzt: Telefon/SIP-Sprache. Die Aurora-Anbindung (ADR 0015) ist nur gegen einen Mock mit Aurora-Antwortformat geprüft. Live-Gespräch im Browser (ADR 0014) ist nur mit Fake-Mikrofon und Mock-Modellen geprüft. Die Telegram Mini App (ADR 0013) ist nur lokal mit einem Telegram-Stub geprüft.
 Der Firecracker-Provider ist nur gegen einen Fake der Firecracker-API getestet (kein KVM in der Entwicklungsumgebung).
 Der Google- und der Microsoft-365-Connector (Mail, Kalender) sind nur gegen einen lokalen Fake-Server getestet, nicht gegen die echten Dienste.
 

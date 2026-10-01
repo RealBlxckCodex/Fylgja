@@ -21,6 +21,7 @@ import (
 
 	"github.com/realblxckcodex/fylgja/internal/api"
 	"github.com/realblxckcodex/fylgja/internal/audit"
+	"github.com/realblxckcodex/fylgja/internal/aurora"
 	"github.com/realblxckcodex/fylgja/internal/auth"
 	"github.com/realblxckcodex/fylgja/internal/channels"
 	"github.com/realblxckcodex/fylgja/internal/channels/discord"
@@ -106,13 +107,14 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger, ui http.Handl
 	a.master = master
 	a.Keyring = vault.NewKeyring(master)
 	a.Redactor = vault.NewRedactor()
-	for _, s := range []string{cfg.Microsoft.ClientSecret, cfg.Google.ClientSecret, cfg.Channels.Telegram.Token, cfg.Channels.Discord.Token, cfg.Fleet.RunPodAPIKey, cfg.Router.ExternalToken, cfg.MasterKey} {
+	for _, s := range []string{cfg.Voice.Aurora.APIKey, cfg.Microsoft.ClientSecret, cfg.Google.ClientSecret, cfg.Channels.Telegram.Token, cfg.Channels.Discord.Token, cfg.Fleet.RunPodAPIKey, cfg.Router.ExternalToken, cfg.MasterKey} {
 		a.Redactor.Register(s)
 	}
 	a.Audit = &audit.PG{Pool: pool}
 	a.Bus = &events.Bus{Pool: pool, Log: log}
 
 	// ---- Router & Flotte ----
+	seedAurora(&a.Cfg)
 	a.Router = router.New(router.DefaultConfig(), nil, &decisionRecorder{pool: pool})
 	if err := a.loadCatalog(ctx); err != nil {
 		return nil, err
@@ -257,7 +259,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger, ui http.Handl
 		}
 		skillReg = &skills.Registry{HTTP: guard.Client(20 * time.Second), URLs: cfg.Skills.Registries, Trust: trust}
 	}
-	a.API = &api.Server{SkillRegistry: skillReg, Voice: api.Voice{Router: a.Router}, TelegramToken: tgMiniAppToken(cfg), Google: a.Google, Microsoft: a.Microsoft, Pool: pool, Auth: a.Auth, Passkeys: a.Passkeys, Runtime: a.Engine, Memory: a.Memory, Hub: a.Hub, Bus: a.Bus,
+	a.API = &api.Server{SkillRegistry: skillReg, Voice: api.Voice{Router: a.Router, Aurora: auroraClient(cfg), Defaults: a.Cfg.Voice.Aurora}, TelegramToken: tgMiniAppToken(cfg), Google: a.Google, Microsoft: a.Microsoft, Pool: pool, Auth: a.Auth, Passkeys: a.Passkeys, Runtime: a.Engine, Memory: a.Memory, Hub: a.Hub, Bus: a.Bus,
 		Router: a.Router, Fleet: a.Fleet, Tunnel: a.Tunnel, NodeCA: a.NodeCA, Links: a.Links, Coord: a.Coord, Pulse: a.Pulse, Tools: a.Tools, Sandbox: a.Sandbox, Audit: a.Audit,
 		Keyring: a.Keyring, Redactor: a.Redactor, Log: log, UI: ui, BaseURL: cfg.BaseURL, Secure: strings.HasPrefix(cfg.BaseURL, "https://"),
 		RouterToken: cfg.Router.ExternalToken, HookKey: derive(master, "hooks"), SkillKey: derive(master, "skills"), Version: version}
@@ -584,4 +586,59 @@ func miniAppURL(cfg config.Config) string {
 		return ""
 	}
 	return strings.TrimRight(cfg.BaseURL, "/") + "/tg"
+}
+
+// seedAurora ergänzt die Router-Konfiguration um die logischen Modelle stt/tts und je ein Deployment auf Aurora.
+// Selbst definierte Einträge gleichen Namens bleiben unangetastet.
+func seedAurora(cfg *config.Config) {
+	au := &cfg.Voice.Aurora
+	if au.Endpoint == "" {
+		return
+	}
+	hasModel := func(n string) bool {
+		for _, m := range cfg.Router.Models {
+			if m.Name == n {
+				return true
+			}
+		}
+		return false
+	}
+	hasDep := func(n string) bool {
+		for _, d := range cfg.Router.Deployments {
+			if d.Name == n {
+				return true
+			}
+		}
+		return false
+	}
+	if au.STTModel == "" {
+		au.STTModel = "whisper-turbo"
+	}
+	if au.TTSModel == "" {
+		au.TTSModel = "kokoro-v1"
+	}
+	if au.Voice == "" {
+		au.Voice = "af_heart"
+	}
+	ep := strings.TrimRight(au.Endpoint, "/") + "/v1"
+	keyEnv := ""
+	if au.APIKey != "" {
+		keyEnv = "FYLGJA_AURORA_API_KEY"
+	}
+	for _, x := range []struct{ logical, served string }{{"stt", au.STTModel}, {"tts", au.TTSModel}} {
+		if !hasModel(x.logical) {
+			cfg.Router.Models = append(cfg.Router.Models, config.ModelSeed{Name: x.logical, PrivacyClass: "self_hosted", QualityRank: 2})
+		}
+		if n := "aurora-" + x.logical; !hasDep(n) {
+			cfg.Router.Deployments = append(cfg.Router.Deployments, config.DeploymentSeed{Name: n, Model: x.logical, Provider: "local", Engine: "remote_api",
+				Endpoint: ep, ServedModel: x.served, APIKeyEnv: keyEnv, MaxConcurrency: 2})
+		}
+	}
+}
+
+func auroraClient(cfg config.Config) *aurora.Client {
+	if cfg.Voice.Aurora.Endpoint == "" {
+		return nil
+	}
+	return &aurora.Client{BaseURL: cfg.Voice.Aurora.Endpoint, APIKey: cfg.Voice.Aurora.APIKey}
 }
